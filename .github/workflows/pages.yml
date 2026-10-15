@@ -1,0 +1,93 @@
+name: Deploy static site to Pages
+
+# 本站是一个**静态快照站**：数据在构建期读取 `web/public/data/`，
+# 因此 CI 里不需要任何密钥、数据库或后端服务 —— 也不该有。
+#
+# 触发方式：
+#   * 推送到 main（快照更新后推送，就是在这个动作里部署）
+#   * 手动（Actions 页面上的 Run workflow）
+#
+# ⚠️ 若改用"从分支部署"（Settings → Pages → Source: Deploy from a branch），
+#    必须确认 `web/public/.nojekyll` 存在：Jekyll 会**静默丢弃**下划线开头的
+#    目录，而 Next.js 的全部 JS/CSS 都在 `_next/` 下 —— 症状是页面能打开、
+#    但完全没样式没交互。用下面的 Actions 流程则不会跑 Jekyll，该文件是保险。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 只有 deploy job 需要写权限；build job 保持只读。
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建静态站点
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      # 版本必须与 pnpm-workspace.yaml 里的 allowBuilds 语义一致（pnpm 11 才支持）；
+      # lockfileVersion 为 9.0。与私有仓库的 CI 保持同一版本，避免"本地能过、
+      # CI 挂掉"这类两边不一致导致的排查。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      # ★ basePath 从**仓库名**推导，不硬编码。
+      #   项目页的 URL 是 https://<user>.github.io/<repo>/，而 repo 名可以在
+      #   GitHub 上改 —— 硬编码时改名后会全站资源 404，且症状只在项目页出现。
+      #   Next.js 会用它同时处理页面路由与 _next 资源；手写 fetch 另见
+      #   web/lib/base-path.ts。
+      - name: 构建（静态导出）
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+
+      # 快照缺失时构建**会失败**（见 web/next.config.ts 的哨兵）。
+      # 这里再做一次显式确认，让"部署了一个空站点"在日志里也无从发生。
+      - name: 校验产物
+        run: |
+          test -f out/index.html || { echo "❌ 缺少 out/index.html"; exit 1; }
+          test -f out/.nojekyll || { echo "❌ 缺少 out/.nojekyll"; exit 1; }
+          count=$(find out -name index.html | wc -l)
+          echo "✓ 生成 $count 个页面"
+          test "$count" -gt 10 || { echo "❌ 页面数异常偏少，快照可能为空"; exit 1; }
+          du -sh out
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/out
+
+  deploy:
+    name: 发布到 GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

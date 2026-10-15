@@ -1,0 +1,167 @@
+"use client";
+
+/**
+ * 逐年收益条 —— 识别「某一年爆发」的直接证据。
+ *
+ * ## 为什么这是本页最重要的图
+ *
+ * 只看"近 5 年年化收益"会被单年爆发骗到。实测样本里有一只基金
+ * 近 5 年累计收益在同类中最高，但逐年拆开后是
+ * ``[+400%, −10%, −10%, −10%, −10%]`` —— 五年里四年在亏钱。
+ *
+ * 一根根柱子把这件事实摆出来：**柱子的高度参差不齐，就说明业绩不稳**。
+ * 数字（最差年份、跨度）能给出结论，而图能让人一眼看出形状。
+ *
+ * 逐年收益由**嵌套的累计收益**相除得到（上游接口只提供累计值，
+ * 但近1年 ⊂ 近2年 ⊂ …，相邻两期相除即还原单年收益）。
+ *
+ * ## 为什么数值必须**直接画在图上**
+ *
+ * 最初只把数值放在 `title` 属性里（悬停才显示）。那是错的，两个层面：
+ *
+ * 1. **触屏设备上 `title` 根本不显示** —— 也就是说手机上这个图
+ *    只有柱子、没有任何数字，而它恰恰是本页最重要的一张图。
+ *    这不是"不方便"，是**数据在移动端完全不可得**。
+ * 2. 键盘用户同样取不到 `title`（不可聚焦），读屏器对它的支持也不一致。
+ *
+ * 因此数值一律直接渲染。`title` 保留，但只作为补充而非唯一入口。
+ */
+
+import { fmt } from "@/lib/format";
+
+//: 绘图区高度（像素）。
+//:
+//: ★ **必须用固定像素**，不能用百分比。最初写的是
+//: `h-full` + `position: absolute` 的百分比定位，结果柱子高度算出来是 **0** ——
+//: 父容器的高度来自 `min-height` 而非确定高度，百分比无法解析。
+//: 这种错误在源码里看不出来（class 名字都合理），
+//: 只有真实浏览器里量一下才发现（实测 `getBoundingClientRect().height === 0`）。
+//:
+//: 取 128 而非更小，是为了给柱顶/柱底的数值标签留出空间 ——
+//: 详见下方 `LABEL_GAP` 的说明。
+const PLOT_HEIGHT = 128;
+
+//: 数值标签与柱顶的间距（像素）。
+//:
+//: 标签高度（像素）。写进常量是为了能把余量算清楚，而不是靠目测试参数。
+const LABEL_HEIGHT = 11;
+
+//: 数值标签与柱顶的间距（像素）。
+//:
+//: 布局余量可以**算清楚**，不需要靠调参试出来：
+//: 缩放基准取 ``1.5 × 峰值``，因此最高的一根柱子也只占半区高度的 2/3
+//: （``(1 / 1.5) × half``）。
+//:
+//: 以 ``half = 64`` 计：最高柱 ``64 / 1.5 = 42.7px``，
+//: 顶部空出 ``64 − 42.7 = 21.3px``，放一个 11px 标签后仍余 6.3px。
+//: 负向同理：``64 + 42.7 + 4 + 11 = 121.7 < 128``。
+//:
+//: （首版取 112 时负向最深处是 108.3，虽然也「放得下」，
+//: 但第 5 年的标签已经贴到容器边缘 —— 视觉上像被裁掉了。
+//: 余量要按「看起来舒服」而不只是「不溢出」来留。）
+const LABEL_GAP = 4;
+
+export function YearlyReturns({
+  years,
+  worst,
+  spread,
+}: {
+  years: number[];
+  worst: number;
+  spread: number;
+}) {
+  if (years.length === 0) return null;
+
+  // 以 0 为轴，正负分列；上下限取绝对值最大者，使正负可比。
+  //
+  // 缩放基准取 `1.5 × 最大绝对值`，并保留 5pp 的地板 ——
+  // 三个约束各有理由：
+  //
+  // * **贴合数据**：固定基准（如 10pp）会让债券基金的柱子全被压扁
+  //   （实测某纯债基金逐年 2.72%~4.72%，柱子只有容器高度的 13%），
+  //   图看不出形状，等于没画。
+  // * **1.5 倍留白**：基准若等于最大值，最大的一根会顶满容器、
+  //   其余全被压缩；留 50% 余量让各年可比，也顺带给标签留出空间。
+  // * **5pp 地板**：反过来，若基准完全跟随数据，一只逐年只波动
+  //   0.1pp 的基金会被放大成"参差不齐"，而它其实极其平稳 ——
+  //   那比画不出来更糟，因为它在**误导**。
+  const peak = Math.max(...years.map((value) => Math.abs(value)));
+  const bound = Math.max(peak * 1.5, 5);
+  const half = PLOT_HEIGHT / 2;
+
+  //: 柱子的最小可见高度（像素）。
+  //:
+  //: ★ 没有它，**接近 0 的年份会完全看不见**，而那恰恰是最该看到的信息。
+  //: 实测某基金逐年 ``[0.89, 0.01, −0.01, 1.90, 3.21]`` ——
+  //: −0.01% 的柱高算出来是 0.1px，等于消失，
+  //: 用户会以为"那一年是 0"，而实际是**亏损年**。
+  //: 一个亏损年份被渲染成看不见的线，是比不画图更坏的误导。
+  const MIN_BAR = 3;
+
+  return (
+    <div>
+      <div className="flex items-stretch gap-1.5" style={{ height: PLOT_HEIGHT }}>
+        {years.map((value, index) => {
+          const positive = value >= 0;
+          const raw = (Math.abs(value) / bound) * half;
+          // 有实际数值的年份至少画 3px；真正的 0 不画（避免把 0 说成小涨）
+          const height = value === 0 ? 0 : Math.min(half, Math.max(raw, MIN_BAR));
+          const tip = positive ? half - height : half + height;
+          return (
+            <div key={index} className="relative flex-1">
+              {/* 零轴 */}
+              <div
+                className="absolute inset-x-0 border-t border-line/70"
+                style={{ top: half }}
+              />
+              <div
+                className="absolute inset-x-0 rounded-sm"
+                style={{
+                  height,
+                  top: positive ? half - height : half,
+                  background: positive ? "var(--pass)" : "var(--fail)",
+                  opacity: 0.85,
+                }}
+              />
+              {/*
+                数值标签：锚在柱顶（正向）或柱底（负向）的外侧。
+                显式带 `+`/`−` 符号 —— 颜色是唯一的正负线索时，
+                色觉障碍用户无法区分涨跌；符号让编码变冗余。
+              */}
+              <div
+                className="num absolute inset-x-0 text-center text-[10.5px] leading-none tabular-nums"
+                style={{
+                  top: positive ? tip - LABEL_HEIGHT - LABEL_GAP : tip + LABEL_GAP,
+                  color: positive ? "var(--fg-muted)" : "var(--fail)",
+                }}
+                title={`第 ${index + 1} 年 ${value > 0 ? "+" : ""}${fmt(value)}%`}
+              >
+                {value > 0 ? "+" : ""}
+                {fmt(value)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/*
+        横轴刻度保持紧凑的 `1 2 3 4 5`。
+        首版写成「第 N 年」在窄视口下会折行，把一行清爽的刻度变成参差的
+        两行文本 —— 而「第 N 年」这个含义已由下方说明句交代，不必重复。
+      */}
+      <div className="mt-1.5 flex gap-1.5">
+        {years.map((_value, index) => (
+          <div key={index} className="num flex-1 text-center text-[9.5px] text-fg-subtle">
+            {index + 1}
+          </div>
+        ))}
+      </div>
+      <p className="num mt-2 text-[11px] text-fg-muted">
+        最差年度 <span style={{ color: worst < 0 ? "var(--fail)" : "var(--pass)" }}>{fmt(worst)}%</span>
+        <span className="mx-1.5 text-fg-subtle">·</span>
+        跨度 {fmt(spread)}pp
+        <span className="mx-1.5 text-fg-subtle">·</span>
+        <span className="text-fg-subtle">横轴为「第 N 年」，非日历年</span>
+      </p>
+    </div>
+  );
+}

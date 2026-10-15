@@ -1,0 +1,27 @@
+# 允许这两个依赖执行原生构建脚本（pnpm 11 用 allowBuilds）：
+#   @tailwindcss/oxide —— Tailwind v4 的原生引擎，必需
+#   sharp              —— Next.js 的图片处理依赖
+allowBuilds:
+  "@tailwindcss/oxide": true
+  sharp: true
+
+# ★ 把 ESLint 生态的包公开提升到根 node_modules。
+#
+# 为什么必需：`eslint.config.mjs` 用 FlatCompat 桥接 `eslint-config-next`
+# （它仍以 eslintrc 格式分发，见该文件说明）。FlatCompat 会**从配置文件所在
+# 目录**去 resolve 插件，也就是 `web/node_modules`。
+#
+# 而 pnpm 的隔离式布局只把**直接依赖**链到根，`eslint-config-next` 自己的
+# 依赖（eslint-plugin-react / -react-hooks / -jsx-a11y / -import、
+# @next/eslint-plugin-next…）都躺在 `.pnpm/` 下，根目录看不见 ——
+# 于是 `pnpm lint` 报 "ESLint couldn't find the plugin ..."。
+#
+# 这个默认行为是 pnpm 9 改掉的：此前 pnpm 默认 public-hoist-pattern 为
+# `["*eslint*", "*prettier*"]`，pnpm 9 起取消了该默认值。本项目迁移到
+# pnpm 11 时，Lint 就**在新环境里静默失效**了 —— 本地能过是因为旧安装
+# 残留了被提升的包，CI 与全新克隆则会失败。
+#
+# 只提升 eslint 相关包，而不是用 shamefullyHoist 整片提升：
+# 后者会掩盖"依赖漏声明"这类问题，而本项目专门有一个 CI job 在防它。
+publicHoistPattern:
+  - "*eslint*"

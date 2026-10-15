@@ -1,0 +1,290 @@
+@import "tailwindcss";
+
+/*
+ * 设计系统
+ * ========
+ *
+ * 基调：暗色优先、信息密集、数字优先。
+ *
+ * 这是一个投资纪律工具，用户会长时间盯着数字看。因此：
+ * - 暗色为默认（降低长时间阅读疲劳），但完整支持亮色切换；
+ * - 数字一律等宽对齐（tabular-nums），否则表格里的数字无法纵向比较；
+ * - 用"层级表面"而非重边框来划分区域 —— 边框只用于真正的分界；
+ * - 语义色只在表达判断时出现，不用于装饰。
+ *
+ * 主题切换用 [data-theme] 而非 prefers-color-scheme：前者允许用户显式选择，
+ * 且在 SSR 下不会闪烁（由 layout 里的内联脚本在首帧前设定）。
+ */
+
+/* 让 dark: 变体跟随 data-theme 而不是系统偏好 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ------------------------------------------------------------------ */
+/* 色板：亮色（默认值，会被 [data-theme] 覆盖）                          */
+/* ------------------------------------------------------------------ */
+:root {
+  --bg: oklch(0.985 0.002 265);
+  --bg-elevated: oklch(1 0 0);
+  --surface: oklch(0.975 0.003 265);
+  --surface-hover: oklch(0.955 0.005 265);
+  --line: oklch(0.90 0.006 265);
+  --line-strong: oklch(0.84 0.008 265);
+
+  --fg: oklch(0.21 0.012 265);
+  --fg-muted: oklch(0.48 0.014 265);
+  --fg-subtle: oklch(0.62 0.012 265);
+  --fg-inverse: oklch(0.99 0 0);
+
+  /* 语义色：只在表达判断时使用 */
+  --pass: oklch(0.55 0.13 158);
+  --pass-bg: oklch(0.55 0.13 158 / 0.10);
+  --fail: oklch(0.55 0.18 22);
+  --fail-bg: oklch(0.55 0.18 22 / 0.10);
+  --warn: oklch(0.62 0.14 70);
+  --warn-bg: oklch(0.62 0.14 70 / 0.10);
+  --neutral-mark: oklch(0.58 0.01 265);
+  --neutral-mark-bg: oklch(0.58 0.01 265 / 0.10);
+  --accent: oklch(0.52 0.17 268);
+  --accent-bg: oklch(0.52 0.17 268 / 0.10);
+
+  /* 数据可视化用色（与语义色分离，避免"红线=失败"的误读） */
+  --viz-line: oklch(0.52 0.17 268);
+  --viz-area: oklch(0.52 0.17 268 / 0.14);
+  --viz-grid: oklch(0.90 0.006 265);
+  --viz-zero: oklch(0.55 0.18 22 / 0.45);
+
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04), 0 1px 1px oklch(0 0 0 / 0.02);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
+  --shadow-lg: 0 12px 32px oklch(0 0 0 / 0.10), 0 2px 8px oklch(0 0 0 / 0.05);
+}
+
+/* ------------------------------------------------------------------ */
+/* 色板：暗色                                                          */
+/* ------------------------------------------------------------------ */
+[data-theme="dark"] {
+  --bg: oklch(0.145 0.006 265);
+  --bg-elevated: oklch(0.185 0.008 265);
+  --surface: oklch(0.205 0.008 265);
+  --surface-hover: oklch(0.245 0.010 265);
+  --line: oklch(0.30 0.010 265);
+  --line-strong: oklch(0.38 0.012 265);
+
+  --fg: oklch(0.96 0.004 265);
+  --fg-muted: oklch(0.72 0.012 265);
+  --fg-subtle: oklch(0.58 0.012 265);
+  --fg-inverse: oklch(0.16 0.006 265);
+
+  --pass: oklch(0.75 0.14 158);
+  --pass-bg: oklch(0.75 0.14 158 / 0.14);
+  --fail: oklch(0.72 0.16 22);
+  --fail-bg: oklch(0.72 0.16 22 / 0.14);
+  --warn: oklch(0.80 0.13 75);
+  --warn-bg: oklch(0.80 0.13 75 / 0.14);
+  --neutral-mark: oklch(0.66 0.012 265);
+  --neutral-mark-bg: oklch(0.66 0.012 265 / 0.14);
+  --accent: oklch(0.72 0.14 268);
+  --accent-bg: oklch(0.72 0.14 268 / 0.16);
+
+  --viz-line: oklch(0.72 0.14 268);
+  --viz-area: oklch(0.72 0.14 268 / 0.18);
+  --viz-grid: oklch(0.30 0.010 265);
+  --viz-zero: oklch(0.72 0.16 22 / 0.5);
+
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-md: 0 4px 14px oklch(0 0 0 / 0.35);
+  --shadow-lg: 0 16px 40px oklch(0 0 0 / 0.45);
+}
+
+/* ------------------------------------------------------------------ */
+/* 把 CSS 变量映射为 Tailwind 工具类                                     */
+/* inline 让工具类引用变量本身，从而随主题切换实时生效                     */
+/* ------------------------------------------------------------------ */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-inverse: var(--fg-inverse);
+  --color-pass: var(--pass);
+  --color-pass-bg: var(--pass-bg);
+  --color-fail: var(--fail);
+  --color-fail-bg: var(--fail-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-muted-mark: var(--neutral-mark);
+  --color-muted-mark-bg: var(--neutral-mark-bg);
+  --color-accent: var(--accent);
+  --color-accent-bg: var(--accent-bg);
+
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --shadow-card: var(--shadow-sm);
+  --shadow-float: var(--shadow-md);
+  --shadow-modal: var(--shadow-lg);
+}
+
+/* ------------------------------------------------------------------ */
+/* 基础                                                               */
+/* ------------------------------------------------------------------ */
+* {
+  border-color: var(--line);
+}
+
+html {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 数字：等宽 + 表格数字，保证纵向可比。这是金融界面的硬要求。 */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  letter-spacing: -0.015em;
+}
+
+/* 微标签：小号、宽字距、大写。用于字段名而非内容。 */
+.micro {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+/* 焦点环：键盘可达性。用 accent 色，不与语义色混淆。 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 滚动条：暗色下默认滚动条很突兀 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-subtle);
+  background-clip: content-box;
+}
+
+/* ------------------------------------------------------------------ */
+/* 动效                                                               */
+/* ------------------------------------------------------------------ */
+
+/* 数据入场：淡入 + 轻微上移。用于卡片首次渲染。 */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 骨架屏微光 */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* 图表线条绘制 */
+@keyframes draw {
+  from {
+    stroke-dashoffset: var(--dash-len, 1000);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: 6px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--fg) 7%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+/* 尊重系统的"减少动态效果"偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 细节                                                               */
+/* ------------------------------------------------------------------ */
+
+/* 隐藏 details 的默认三角，用自绘图标 */
+details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* 数值单元格右对齐（财务表格惯例） */
+td.num-cell,
+th.num-cell {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 选中文本用主题色 */
+::selection {
+  background: var(--accent-bg);
+}

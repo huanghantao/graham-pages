@@ -1,0 +1,31 @@
+# 站点产物
+#
+# ⚠️ 这里**刻意不忽略** `web/public/data/` —— 那个目录就是本站的数据源，
+#    必须入库。私有仓库里的同名规则是为"生成的中间产物"设的，
+#    公开仓库的场景完全不同（快照就是站点的全部内容）。
+#
+#    若误加了这条忽略，构建会**明确失败**并打印修复指引
+#    （见 web/next.config.ts 的 assertSnapshotPresent），
+#    而不会静默产出一个空站点。
+
+node_modules/
+web/node_modules/
+
+# Next.js 构建产物
+web/.next/
+web/out/
+web/tsconfig.tsbuildinfo
+
+# Next.js 自动生成，明确要求不要手改
+web/next-env.d.ts
+
+# 环境
+.env
+.env.*
+!.env.example
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/
+*.swp
