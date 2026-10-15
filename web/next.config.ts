@@ -8,13 +8,13 @@ import type { NextConfig } from "next";
  *
  * 为什么是静态导出
  * ----------------
- * 本站的浏览路径本来就是纯读（见 README「读写路径分离」）：配额只在 ETL 时
- * 消耗，且与访问量无关。于是整个浏览体验等价于 `站点 = f(一份快照)` ——
- * 把 `f` 在构建时跑完，产物就是静态文件，不需要在线服务，也不需要把引擎
- * 或数据库交出去。
+ * 本站的数据在构建期就已确定：读一份随仓库发布的快照，页面一次性渲染成
+ * HTML。于是整个站点等价于 `站点 = f(一份快照)` —— 把 `f` 在构建时跑完，
+ * 产物就是静态文件，运行时不依赖任何在线服务。
  *
- * 因此这里不再有 `output: "standalone"`（那是自部署容器用的），数据也不再
- * 来自 `GRAHAM_API_BASE`，而是构建期就在磁盘上的快照（见 `lib/snapshot.ts`）。
+ * 因此这里没有 `output: "standalone"`（那是自部署容器用的）：本站产出的是
+ * 纯静态文件，不是需要 Node 运行时的应用。数据来自构建期就在磁盘上的快照
+ * （见 `lib/snapshot.ts`）。
  *
  * ⚠️ 三条约束，全部由实测触发
  * ---------------------------
@@ -44,9 +44,9 @@ const SNAPSHOT_DIR = path.join(process.cwd(), "public", "data");
  * 文件就返回 `null`，各页面于是渲染"尚无数据"的空态。结果是产出一个
  * **能打开、但处处空的站点**，而且从构建日志里看不出任何异常。
  *
- * 这个哨兵把"静默的空站"换成一条明确指令。触发它的典型场景有两个：
- * ① 忘了先跑发布；② 用 rsync 把源码同步到公开仓库时，快照被 `.gitignore`
- * 一起挡掉了 —— 后者的症状与前者一样，但更难想到。
+ * 这个哨兵把"静默的空站"换成一条明确指令。两种典型触发场景：
+ * ① 忘了先生成快照；② `public/data/` 被 `.gitignore` 挡掉而没进仓库 ——
+ * 后者的症状与前者一样，但更难想到。
  */
 function assertSnapshotPresent(): void {
   const manifest = path.join(SNAPSHOT_DIR, "manifest.json");
@@ -63,7 +63,7 @@ function assertSnapshotPresent(): void {
         "",
         "或用真实快照：python -m graham.cli publish --db data/graham.db --out web/public/data",
         "",
-        "⚠️ 若这是公开仓库：请确认 public/data/ 未被 .gitignore 挡掉。",
+        "⚠️ 请确认 public/data/ 未被 .gitignore 挡掉（否则快照不会进仓库）。",
       ].join("\n"),
     );
   }

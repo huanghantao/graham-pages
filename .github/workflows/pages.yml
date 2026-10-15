@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # 版本必须与 pnpm-workspace.yaml 里的 allowBuilds 语义一致（pnpm 11 才支持）；
-      # lockfileVersion 为 9.0。与私有仓库的 CI 保持同一版本，避免"本地能过、
+      # lockfileVersion 为 9.0。与本地开发保持同一版本，避免"本地能过、
       # CI 挂掉"这类两边不一致导致的排查。
       - uses: pnpm/action-setup@v4
         with:
