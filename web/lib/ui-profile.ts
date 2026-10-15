@@ -2,21 +2,45 @@
 import contract from "@/ui-profiles.json";
 
 /**
- * 需要按档案决定"存不存在"的产品表面。
+ * 一个表面**存在**所需的一项前提。
  *
- * ★ 每项能力的**前提不同**，所以在 :func:`hasCapability` 里各自求值：
+ * ★ 把前提显式建模成数据，而不是在判定函数里写分支 —— 这是本模块的核心
+ * 取舍，来自一个真实教训：上一版 `hasCapability` 是 `switch`，每加一项能力
+ * 就要改同一个函数。分支一多，"哪些前提"就变成了散在控制流里的知识，
+ * 而它本该是一张**读得出来的表**。
+ */
+export type Requirement =
+  /** 需要某个产物已发布 —— 数据不该在界面里"看起来有"。 */
+  | { readonly kind: "artifact"; readonly id: string }
+  /** 需要运行时进程 —— 写操作、子进程、外部仓库访问都要它。 */
+  | { readonly kind: "server" };
+
+/** 需要按档案决定"存不存在"的产品表面。 */
+export type Capability = "strategies" | "methodology" | "publishing" | "automation";
+
+/**
+ * 每项能力的**前提表** —— 单一事实源。
  *
  * | 能力 | 前提 | 为什么 |
  * |---|---|---|
  * | `strategies` | 策略产物已发布 | 没有数据的页面会渲染成"今天没命中"，比 404 更误导 |
  * | `methodology` | 判据清单与契约已发布 | 同上 |
- * | `publishing` | 本部署**有服务端** | 它要执行写操作，静态导出没有运行时进程 |
+ * | `publishing` | 服务端 | 要起子进程、写外部仓库 |
+ * | `automation` | 服务端 | 要写配置、触发抓取，都是写操作 |
  *
- * 新增一项能力 = 这里加一个联合成员 + `hasCapability` 加一个分支 +
- * 页面首行调用 `requireCapability`。若它还需要服务端，则同时把源码路径
- * 登记进 `publish_site.py` 的 `SERVER_ONLY_SOURCE_PATHS`，让公开投影剪掉它。
+ * ★ **新增一项能力 = 这里加一行**（外加页面首行调 `requireCapability`）。
+ * 若该能力还需要服务端，同时把源码路径登记进 `publish_site.py` 的
+ * `SERVER_ONLY_SOURCE_PATHS`，让公开投影整条剪除。
  */
-export type Capability = "strategies" | "methodology" | "publishing";
+const CAPABILITY_REQUIREMENTS: Record<Capability, readonly Requirement[]> = {
+  strategies: [{ kind: "artifact", id: "strategies.json" }],
+  methodology: [
+    { kind: "artifact", id: "methodology.json" },
+    { kind: "artifact", id: "contracts.json" },
+  ],
+  publishing: [{ kind: "server" }],
+  automation: [{ kind: "server" }],
+};
 
 /** 披露级别 —— 产物发布了，但内部标识要不要露出来。 */
 export interface DisclosurePolicy {
@@ -105,26 +129,40 @@ export const UI_PROFILE: UiProfile = resolveUiProfile(process.env[PROFILE_ENV]);
  * 不同而各说各话：JSON 里把 `strategies.json` 加进 `withheld_artifacts`，
  * 引擎就不再产出它，UI 也同时不再给出入口，只有一处要改。
  *
- * 用 `switch` 而不是若干 `if`：新增能力时 `never` 兜底会让**编译期**报错，
- * 而不是悄悄回落到某个默认分支（那正是"新页面在公开站上泄漏"的成因）。
+ * 求值是"**所有前提都满足**"的合取。因此这里没有分支 —— 新增能力改的是
+ * `CAPABILITY_REQUIREMENTS` 那张表，而不是本函数。这一点是刻意的：分支
+ * 落在函数里时，"这项能力需要什么"就散进了控制流，读不出来。
  */
 export function hasCapability(capability: Capability): boolean {
-  const withheld = (artifact: string) => UI_PROFILE.withheldArtifacts.includes(artifact);
+  return CAPABILITY_REQUIREMENTS[capability].every(satisfies);
+}
 
-  switch (capability) {
-    case "strategies":
-      return !withheld("strategies.json");
-    case "methodology":
-      return !withheld("methodology.json") && !withheld("contracts.json");
-    case "publishing":
-      // 需要真正的服务端进程：写操作要落盘、要起子进程。
+/** 单项前提是否满足。 */
+function satisfies(requirement: Requirement): boolean {
+  switch (requirement.kind) {
+    case "artifact":
+      return !UI_PROFILE.withheldArtifacts.includes(requirement.id);
+    case "server":
+      // 需要真正的运行时进程：写操作要落盘、要起子进程。
       // 静态导出没有运行时，因此这一项在公开站上恒为 false。
       return UI_PROFILE.server;
     default: {
-      const exhaustive: never = capability;
-      throw new Error(`未处理的能力：${String(exhaustive)}`);
+      // ★ 穷尽性守卫。`strict` 不含 `noImplicitReturns`，所以漏掉一个
+      // `kind` 时函数会静默返回 `undefined` —— 而 `Array.every` 把
+      // `undefined` 当假值，于是**新增的前提会被当成不满足**，页面莫名 404。
+      // 这里让它在编译期就报错。
+      const exhaustive: never = requirement;
+      throw new Error(`未处理的前提类型：${JSON.stringify(exhaustive)}`);
     }
   }
+}
+
+/** 当前档案下各能力的状态（供诊断与页面展示）。 */
+export function capabilityReport(): { capability: Capability; granted: boolean }[] {
+  return (Object.keys(CAPABILITY_REQUIREMENTS) as Capability[]).map((capability) => ({
+    capability,
+    granted: hasCapability(capability),
+  }));
 }
 
 /** 是否展示数据来源身份。 */

@@ -74,6 +74,12 @@ const FOOTER_LINKS: readonly FooterLink[] = [
     capability: "methodology",
   },
   {
+    href: "/automation",
+    label: "自动化",
+    hint: "定时抓取与失败通知的配置",
+    capability: "automation",
+  },
+  {
     href: "/publish",
     label: "发布",
     hint: "把快照与源码同步到公开站仓库",
