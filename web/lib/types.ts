@@ -383,7 +383,13 @@ export interface StockDetail {
 export interface Manifest {
   schema_version: number;
   as_of: string | null;
-  generated_at: string;
+  /**
+   * **数据**批次的生成时刻（来自库中那条 run 记录），不是发布时刻。
+   *
+   * 刻意不含发布时刻：manifest 描述数据，发布事件的时间由 git 提交记录。
+   * 用墙钟时间会让每次发布的字节都不同，四阶段流水线因此永远收敛不了。
+   */
+  data_generated_at: string | null;
   source_commit: string | null;
   trust_level: string | null;
   contracts: { total: number | null; passed: number | null };
