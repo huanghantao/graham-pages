@@ -52,7 +52,7 @@ const SNAPSHOT_DIR = path.join(process.cwd(), "public", "data");
  *   * 工作台界面 + 公开快照 → 导航里有策略入口、点进去却是 404，**这是坏的**。
  * 与其推理哪种错配更可能发生，不如让不一致时直接构建失败。
  */
-function assertSnapshotUsable(): void {
+function assertSnapshotUsable(uiProfile: string): void {
   const manifest = path.join(SNAPSHOT_DIR, "manifest.json");
   if (!fs.existsSync(manifest)) {
     throw new Error(
@@ -76,7 +76,6 @@ function assertSnapshotUsable(): void {
     profile?: { profile?: string };
   };
   const snapshotProfile = raw.profile?.profile;
-  const uiProfile = process.env.NEXT_PUBLIC_UI_PROFILE ?? "workbench";
   if (snapshotProfile && snapshotProfile !== uiProfile) {
     throw new Error(
       [
@@ -92,8 +91,49 @@ function assertSnapshotUsable(): void {
   }
 }
 
-assertSnapshotUsable();
+/**
+ * 解析当前生效的档案 —— **快照是唯一事实源**。
+ *
+ * ## 为什么不让调用方每次都声明
+ *
+ * 最初的实现要求构建环境自己设 `NEXT_PUBLIC_UI_PROFILE`，没设就默认
+ * `workbench`。这在公开仓里制造了**第二个事实源**：快照里已经写着
+ * `profile: public`，而 CI 还得再声明一次。忘了声明的后果是构建直接失败 ——
+ * 实测中连续两次推送都因此失败，公开站停更数小时，而本地验证"通过"
+ * （因为我手动加了那个环境变量，验证的不是 CI 真正跑的命令）。
+ *
+ * 现在改成：
+ *
+ * 1. **显式设了** `NEXT_PUBLIC_UI_PROFILE` → 用它，并在下面与快照比对
+ *    （守卫因此保留全部牙齿：显式冲突仍然构建失败）；
+ * 2. **没设** → 取**快照自己声明的档案**。公开仓里那份快照就是唯一事实源，
+ *    照它构建必然自洽；
+ * 3. 连快照都没有 → 退回契约的 `default_profile`（本地首次搭建的情形，
+ *    此时下面的哨兵会先一步报"缺少快照"）。
+ *
+ * ## 为什么要在 next.config 里解析，而不是让 ui-profile.ts 自己回退
+ *
+ * 因为 `output` 与 `hasServer` 必须和界面看到的是**同一个**档案 —— 这一处
+ * 解析完，通过 `env` 注入回包的，客户端与构建期就不可能分叉。
+ */
+function resolveProfile(): { id: string; source: string } {
+  const explicit = process.env.NEXT_PUBLIC_UI_PROFILE?.trim();
+  if (explicit) return { id: explicit, source: "环境变量" };
 
+  const manifest = path.join(SNAPSHOT_DIR, "manifest.json");
+  if (fs.existsSync(manifest)) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(manifest, "utf-8")) as {
+        profile?: { profile?: string };
+      };
+      const declared = raw.profile?.profile;
+      if (declared) return { id: declared, source: "快照" };
+    } catch {
+      // 快照损坏由下面的哨兵报出，这里只负责不崩。
+    }
+  }
+  return { id: "", source: "契约缺省" };
+}
 
 /**
  * 当前档案是否有服务端。
@@ -128,7 +168,18 @@ function profileHasServer(profileId: string): boolean {
   return entry.server === true;
 }
 
-const hasServer = profileHasServer(process.env.NEXT_PUBLIC_UI_PROFILE ?? "");
+// ★ 顺序要紧：**先解析档案，再做一致性检查**。
+//
+// 反过来（检查时自己解析一次）就是这条缺陷的成因 —— 两处各有一套回退规则，
+// 而它们的缺省值恰好都是 workbench，于是公开站在"没人设环境变量"时
+// 被判成工作台档案，构建失败。解析一次、检查它、再注入回包。
+//
+// 而且**先验档案名、再验一致性**：拼错的名字应当报"未知的 UI 档案"
+// （可选值一列就明白），而不是报"快照与界面不一致"（看起来像是数据问题，
+// 排查方向完全错）。两条都拦得住，但给出的线索质量差很远。
+const resolvedProfile = resolveProfile();
+const hasServer = profileHasServer(resolvedProfile.id);
+assertSnapshotUsable(resolvedProfile.id);
 
 const nextConfig: NextConfig = {
   // 有服务端 → 默认构建；无服务端 → 纯静态导出。
@@ -137,6 +188,16 @@ const nextConfig: NextConfig = {
   ...(basePath ? { basePath } : {}),
   reactStrictMode: true,
   poweredByHeader: false,
+  // ★ 把**解析结果**注入回包，而不是让 `lib/ui-profile.ts` 自己再解析一次。
+  //
+  // 两处各解析一次是这条缺陷的真正来源：构建期用一套回退规则、客户端用另一套，
+  // 而它们的"默认值"恰好都是 workbench —— 于是公开站在客户端侧悄悄按工作台
+  // 档案渲染，表现为导航里有入口、点进去 404。
+  //
+  // 注意 `lib/ui-profile.ts` 用的是 `process.env[PROFILE_ENV]`（**计算属性**），
+  // Next 的静态替换只认 `process.env.NEXT_PUBLIC_X` 这种字面量访问，因此那条
+  // 路径拿不到注入值 —— 见该文件的 `__UI_PROFILE_ID__` 说明。
+  env: { NEXT_PUBLIC_UI_PROFILE: resolvedProfile.id },
   // 静态导出没有服务端，按需图片优化不可能实现；服务端构建下本项目也没有
   // 图片资源，故两种形态下都关掉，省去一处分支。
   images: { unoptimized: true },

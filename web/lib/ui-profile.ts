@@ -119,8 +119,25 @@ export function resolveUiProfile(raw?: string | null): UiProfile {
   return materialise(id, found);
 }
 
-/** 当前构建生效的档案（由环境变量决定，模块加载时解析一次）。 */
-export const UI_PROFILE: UiProfile = resolveUiProfile(process.env[PROFILE_ENV]);
+/**
+ * 构建期注入的档案标识。
+ *
+ * ★ **必须用字面量属性访问**（`process.env.NEXT_PUBLIC_UI_PROFILE`），不能用
+ * `process.env[PROFILE_ENV]`。Next 的静态替换只认前者：它会把这个**字面量
+ * 表达式**整个替换成注入的字符串；而计算属性访问在浏览器产物里求值为
+ * `undefined`，于是静默落到契约缺省值。
+ *
+ * 后果不对称，所以这里格外强调：缺省值恰好是 `workbench`，即**公开站会按
+ * 工作台档案渲染** —— 导航里出现策略入口、点进去 404。这正是构建期守卫
+ * 存在的理由，而它检查的是服务端那一次解析，管不到客户端这一次。
+ *
+ * 标识本身由 `next.config.ts` 用 :func:`assertSnapshotUsable` 解析**一次**，
+ * 再通过 `env` 注入。单点解析 + 单一取值路径 = 构建期与浏览器不可能分叉。
+ */
+const INJECTED_PROFILE_ID: string | undefined = process.env.NEXT_PUBLIC_UI_PROFILE;
+
+/** 当前构建生效的档案（模块加载时解析一次）。 */
+export const UI_PROFILE: UiProfile = resolveUiProfile(INJECTED_PROFILE_ID);
 
 /**
  * 某个表面在当前档案下是否存在。
