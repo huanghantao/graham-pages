@@ -326,6 +326,13 @@ export interface RiskFlag {
 export interface ProvenanceEntry {
   query_id: string;
   key_label: string;
+  /**
+   * 上游接口标识。**公开档案整键抹除**，故可选 ——
+   * 界面按存在就渲染处理，不需要知道任何厂商名。
+   */
+  skill?: string;
+  /** 上游调用追踪号。公开档案抹除，理由同上。 */
+  trace_id?: string;
   chunks_info: string[];
   status_code: number;
   row_count: number;
@@ -678,4 +685,69 @@ export interface SearchIndex {
   entries: SearchIndexEntry[];
   /** 收录范围说明 —— 搜不到时要把它展示出来，而不是只说"没有匹配"。 */
   published_note: string;
+}
+
+// ── 策略与方法论（仅工作台档案发布）──────────────────────────────────────
+//
+// ★ 这三组类型描述的是公开档案**扣留**的产物（见 `ui-profiles.json`）。
+//   对应的页面必须先确认能力存在（`lib/route-guard.ts`），否则读到的是
+//   空数组而不是"没有这一页"。
+
+export interface StrategySummary {
+  strategy_id: string;
+  label: string;
+  description: string;
+  hit_count: number;
+  universe_size: number;
+  selectivity: number | null;
+  caveats: string[];
+}
+
+export interface StrategyHit {
+  code: string;
+  name: string;
+  industry: string | null;
+  rank: number;
+  mos: number | null;
+  quality: number | null;
+  /** 计价币种（`cny` / `hkd`）—— 命中表会同时出现 A 股与港股。 */
+  currency: string;
+  extra: Record<string, unknown>;
+  notes: string[];
+  /**
+   * 本站是否有这条命中的详情页。
+   *
+   * 详情页只覆盖快照收录范围内的标的，因此命中列表里会有一部分行点不进去。
+   * 前端据此把它们渲染成纯文本，而不是给出一个会 404 的链接 ——
+   * 本项目对"边界"的一贯做法是把它说出来。
+   */
+  has_detail?: boolean;
+}
+
+export interface StrategyHitDetailResponse {
+  hits: StrategyHit[];
+  run: RunInfo | null;
+  status?: DataStatus;
+}
+
+export interface CriterionSpec {
+  id: string;
+  label: string;
+  orthodox: string;
+  modern: string;
+  source: string;
+  caveat: string | null;
+}
+
+export interface QueryContract {
+  query_id: string;
+  market: string;
+  market_label: string;
+  skill: string;
+  question: string;
+  required_metrics: string[];
+  row_bounds: [number, number];
+  critical: boolean;
+  purpose: string;
+  notes: string;
 }

@@ -1,0 +1,20 @@
+{
+  "note": "发布档案 —— 同一套前端面向不同受众时的裁剪规则。本文件是 Python 引擎与 TypeScript UI 共用的唯一事实源，两侧都读它，因此不存在跨语言漂移。改这里即同时改变两侧行为。",
+  "default_profile": "workbench",
+  "profiles": {
+    "workbench": {
+      "label": "工作台（本地研究工具，完整表面）",
+      "server": true,
+      "withheld_artifacts": [],
+      "redact_upstream_identity": false,
+      "strip_criterion_sources": false
+    },
+    "public": {
+      "label": "公开站（只读展示，裁剪后）",
+      "server": false,
+      "withheld_artifacts": ["strategies.json", "methodology.json", "contracts.json"],
+      "redact_upstream_identity": true,
+      "strip_criterion_sources": true
+    }
+  }
+}

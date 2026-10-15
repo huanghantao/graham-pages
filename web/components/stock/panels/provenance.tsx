@@ -14,7 +14,7 @@
 
 import { useState } from "react";
 
-import { Badge, Card, CardBody, CardHeader, Notice, Tabs } from "@/components/ui";
+import { Badge, Card, CardBody, CardHeader, Copyable, Notice, Tabs } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { fmtInt } from "@/lib/format";
 import type { ProvenanceEntry, StockDetail } from "@/lib/types";
@@ -179,12 +179,23 @@ function ProvenanceCard({ entry }: { entry: ProvenanceEntry }) {
             </p>
           ))}
           {/*
-            ★ 这里曾经还展示 `skill`（上游的接口标识）与 `trace_id`
-            （上游的调用追踪号）。两者都已从快照中移除：站点不公开上游
-            身份，而它们对读者也没有价值 —— 要判断的是"这次解析对不对"
-            （那是上面的 chunks_info 与违规/告警的职责），
-            不是"调用的是哪个接口"。
+            ★ 接口标识与追踪号**只在快照里存在时**渲染。
+
+            公开档案把它们整键抹除（见 `graham.publish`），工作台档案保留 ——
+            所以这里是"有就显示"，而不是"判断该不该显示"。披露与否完全由
+            **数据**决定，界面因此不需要知道任何厂商名，公开仓库的源码里
+            也就不会出现它。
           */}
+          {entry.skill || entry.trace_id ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-fg-subtle">
+              {entry.skill ? <span>skill {entry.skill}</span> : null}
+              {entry.trace_id ? (
+                <Copyable value={entry.trace_id}>
+                  trace {entry.trace_id.slice(0, 16)}…
+                </Copyable>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

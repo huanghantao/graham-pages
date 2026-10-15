@@ -335,3 +335,56 @@ export function Sheet({
     </Portal>
   );
 }
+  // ── 复制 ────────────────────────────────────────────────────────────────
+
+/**
+ * 可复制文本。用于溯源面板里的接口标识与调用追踪号。
+ *
+ * ★ 那些字段**只在工作台档案下存在**（公开档案整键抹除），因此这个组件由
+ * 调用方按"字段是否存在"决定要不要渲染 —— 见 `panels/provenance.tsx`。
+ * 换句话说：披露与否由**数据**决定，界面不需要知道任何厂商名，
+ * 公开仓库的源码里也就不会出现它。
+ */
+export function Copyable({
+  value,
+  children,
+  className,
+}: {
+  value: string;
+  children?: React.ReactNode;
+  className?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // 剪贴板不可用（如非 HTTPS）时静默失败：不是关键路径。
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title="点击复制"
+      className={cn(
+        "num group inline-flex items-center gap-1.5 rounded-md border border-transparent px-1 py-0.5 text-left text-[11.5px] text-fg-subtle transition-colors hover:border-line hover:bg-surface hover:text-fg-muted",
+        className,
+      )}
+    >
+      <span className="min-w-0 truncate">{children ?? value}</span>
+      <span
+        className={cn(
+          "shrink-0 text-[10px]",
+          copied ? "text-pass" : "opacity-0 group-hover:opacity-60",
+        )}
+      >
+        {copied ? "已复制" : "复制"}
+      </span>
+    </button>
+  );
+}

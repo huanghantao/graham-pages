@@ -4,6 +4,7 @@ import { AllocationBar, PercentileBar, TemperatureGauge } from "@/components/cha
 import { RunNotice } from "@/components/run-notice";
 import { Bullets, Card, CardBody, CardHeader, Stat } from "@/components/ui/primitives";
 import { getThermometer } from "@/lib/snapshot";
+import { hasCapability, showsCriterionSources } from "@/lib/ui-profile";
 import { fmt, fmtInt, fmtPercent, fmtRatio, fmtSigned } from "@/lib/format";
 
 export const metadata = { title: "市场温度计" };
@@ -247,40 +248,52 @@ export default async function HomePage() {
             </Card>
 
             {/*
-              这张卡原先叫「方法论与已知局限」，含一个"出处"区块
-              （《The Intelligent Investor》第 14 章 pp.89–93 之类）。
+            这张卡分两段：**出处**与**已知局限**。
 
-              "出处"已移除：那是方法论归属，而公开站点不展示方法论
-              （方法论页也已从本站移除）。
-              卡片改名为「已知局限」，保留 caveat —— 它披露的是
-              **这个模型做不到什么**，属于负责任的部分，不该跟着一起删掉：
-              删掉它会让站点显得比实际更确定。
+            已知局限两者都显示 —— 它披露的是"这个模型做不到什么"，
+            属于负责任的部分，删掉会让页面显得比实际更确定。
 
-              快照侧同样摘掉了 `methodology.sources`（见 graham.publish），
-              否则翻 `/data/thermometer.json` 仍能看到。
-            */}
-            <Card className="lg:col-span-5">
-              <CardHeader title="已知局限" hint="不隐藏计算的边界" />
-              <CardBody className="pt-4">
-                <div className="rounded-xl border border-warn/25 bg-warn-bg p-3">
-                  <p className="micro mb-1.5 !text-warn">读数怎么来的</p>
-                  <p className="text-[12px] leading-5 text-fg-muted">
-                    {reading.methodology?.caveat}
-                  </p>
+            出处只在档案允许时显示（工作台要它来复核判据来源）。
+            `sources` 本身也由发布档案决定是否写进快照，因此这里是
+            "有就渲染"，而不是"判断该不该有"。
+          */}
+          <Card className="lg:col-span-5">
+            <CardHeader
+              title={showsCriterionSources() ? "方法论与已知局限" : "已知局限"}
+              hint="不隐藏计算的边界"
+            />
+            <CardBody className="space-y-4 pt-4">
+              {showsCriterionSources() && (reading.methodology?.sources?.length ?? 0) > 0 ? (
+                <div>
+                  <p className="micro mb-1.5">出处</p>
+                  <Bullets items={reading.methodology?.sources ?? []} />
                 </div>
-              </CardBody>
-            </Card>
+              ) : null}
+              <div className="rounded-xl border border-warn/25 bg-warn-bg p-3">
+                <p className="micro mb-1.5 !text-warn">已知局限</p>
+                <p className="text-[12px] leading-5 text-fg-muted">
+                  {reading.methodology?.caveat}
+                </p>
+              </div>
+            </CardBody>
+          </Card>
           </div>
 
           {/* ── 入口 ─────────────────────────────────────────────── */}
           {/*
-            原先这里是"策略池"与"个股"两张卡，现在是"个股"与"基金" ——
-            正好对上导航的三项（温度计 / 个股 / 基金）。
-
-            策略入口已移除：那页给出的是**现成的名单**，最容易被读成荐股，
-            而本项目明确不提供投资建议。
+            入口卡与主导航**同源**：都按当前档案的能力集渲染。
+            策略卡只在策略产物已发布时出现 —— 与页面本身、以及导航项
+            用的是同一个开关（`hasCapability`），因此不会出现
+            "有入口没页面"或"有页面没入口"。
           */}
           <div className="grid gap-4 sm:grid-cols-2">
+            {hasCapability("strategies") ? (
+              <EntryCard
+                href="/strategies"
+                title="策略池"
+                description="防御型七条、Net-Net 双口径、破净+盈利 —— 每个策略都附带方法论提醒"
+              />
+            ) : null}
             <EntryCard
               href="/screener"
               title="个股"

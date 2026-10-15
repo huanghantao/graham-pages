@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { hasCapability, type Capability } from "@/lib/ui-profile";
+
 /**
  * 全站页脚。
  *
@@ -50,10 +52,40 @@ import Link from "next/link";
  * 定时抓取与通知渠道改由命令行管理（`graham schedule` /
  * `GRAHAM_FEISHU_WEBHOOK`），那是它们本来就该待的地方：
  * 只有部署者本人需要，公开站点上没有它们的读者。
+ *
+ * ## 与主导航同源
+ *
+ * 页脚入口同样按档案过滤（`:data:`FOOTER_LINKS`` 每项声明所需能力），
+ * 理由与 app-header 相同：**入口与页面必须由同一个开关派生**。
  */
-const FOOTER_LINKS = [
+interface FooterLink {
+  href: string;
+  label: string;
+  hint: string;
+  capability?: Capability;
+}
+
+const FOOTER_LINKS: readonly FooterLink[] = [
   { href: "/health", label: "数据可信度", hint: "契约校验与已知不可用信号" },
-] as const;
+  {
+    href: "/methodology",
+    label: "方法论",
+    hint: "判据出处与已知局限",
+    capability: "methodology",
+  },
+  {
+    href: "/publish",
+    label: "发布",
+    hint: "把快照与源码同步到公开站仓库",
+    // 运维动作，与「数据可信度」同类：只有部署者本人需要，因此放页脚。
+    // 它还需要服务端（要起子进程、写外部仓库），公开档案下连页面都不存在。
+    capability: "publishing",
+  },
+];
+
+const VISIBLE_FOOTER_LINKS = FOOTER_LINKS.filter(
+  (item) => item.capability === undefined || hasCapability(item.capability),
+);
 
 export function AppFooter() {
   return (
@@ -69,7 +101,7 @@ export function AppFooter() {
           aria-label="页脚导航"
           className="flex flex-wrap items-center gap-2 pb-4"
         >
-          {FOOTER_LINKS.map((item) => (
+          {VISIBLE_FOOTER_LINKS.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -83,8 +115,8 @@ export function AppFooter() {
 
         <div className="flex flex-col gap-2 border-t border-line/50 pt-4 text-[11.5px] leading-5 text-fg-subtle">
           <p>
-            数据来自第三方数据接口，本站不公开其身份；
-            每个数字都可溯源到具体查询，抓取的解析记录与契约校验结论公开在
+            数据取自第三方接口；每个数字都可溯源到具体查询，解析记录与契约校验
+            结论公开在
             <Link
               href="/health"
               className="mx-1 underline decoration-dotted underline-offset-2 hover:text-fg-muted"
@@ -93,6 +125,14 @@ export function AppFooter() {
             </Link>
             页面。
           </p>
+          {/*
+            ★ 这里**刻意不写数据来源的名字**。
+
+            披露与否由**数据**决定，而不是由这个组件里的条件分支决定：
+            快照按档案裁剪（工作台保留接口标识与厂商名，公开档案抹除），
+            界面只负责把存在的东西渲染出来。原因很实际 —— 厂商名一旦写进
+            源码，公开仓库的源码里就又有它了，而那是要避免的。
+          */}
           {/*
             免责声明放在页脚而不是做成一个单独页面：它必须在**每一页**
             可见，而不是需要用户主动去找。措辞刻意比一般项目更硬 ——

@@ -13,6 +13,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { hasCapability, type Capability } from "@/lib/ui-profile";
+
 import { cn } from "@/lib/cn";
 import { CommandPalette } from "./command-palette";
 import { ThemeToggle } from "./theme-toggle";
@@ -50,27 +52,55 @@ import { ThemeToggle } from "./theme-toggle";
  *   不属于「温度计 → 策略 → 个股 → 基金 → 方法论」这条投资决策主线。
  * * 「策略池」→「**策略**」：与导航统一（原先不一致）。
  *
- * ## 为什么只剩三项
+ * ## 导航由档案派生，不再手写两份
  *
- * 「策略」与「方法论」两页已从公开站点移除：
+ * 这里只有**一份**注册表（:data:`ALL_NAV`），每项声明它需要哪个
+ * :type:`Capability`；渲染时按当前档案过滤。于是：
  *
- * * 策略页给出的是**现成的名单**，读起来就是荐股；
- * * 方法论页给出的是**判据口径与出处**，读起来就是"该怎么投"。
+ * * 新增页面 = 加一条注册（并在页面首行调用 `requireCapability`）；
+ * * 公开档案下策略与方法论**自动消失**，不需要维护"另一个版本"的导航。
  *
- * 本项目明确不提供投资建议，而这两页是最容易被那样理解的内容 ——
- * 页面给的是**结论**，读者却会当成**建议**。
- *
- * 于是导航回到一句话能说清的范围：**温度计（现在贵不贵）→ 个股 → 基金**。
+ * ★ 这正是此前那个缺陷的根因：当时为公开站手写了一份"少两项"的导航，
+ *   而页面本身被删掉了 —— 于是工作台既没有入口也没有页面。**入口与页面
+ *   必须由同一个开关派生**，否则迟早会一边有一边没有。
  *
  * 导航标签与页面标题**必须一致**，这条由
  * `tests/unit/test_frontend_contracts.py::TestNavMatchesPageTitle` 守住 ——
  * 不一致会让用户点进页面后怀疑「我是不是点错了」。
  */
-const NAV = [
-  { href: "/", label: "温度计", match: (p: string) => p === "/" },
-  { href: "/screener", label: "个股", match: (p: string) => p.startsWith("/screener") || p.startsWith("/stocks") },
-  { href: "/funds", label: "基金", match: (p: string) => p.startsWith("/funds") },
-] as const;
+interface NavItem {
+  href: string;
+  label: string;
+  match: (pathname: string) => boolean;
+  /** 需要的能力；缺省表示任何档案下都存在。 */
+  capability?: Capability;
+}
+
+const ALL_NAV: readonly NavItem[] = [
+  { href: "/", label: "温度计", match: (p) => p === "/" },
+  {
+    href: "/strategies",
+    label: "策略",
+    match: (p) => p.startsWith("/strategies"),
+    capability: "strategies",
+  },
+  {
+    href: "/screener",
+    label: "个股",
+    match: (p) => p.startsWith("/screener") || p.startsWith("/stocks"),
+  },
+  { href: "/funds", label: "基金", match: (p) => p.startsWith("/funds") },
+  {
+    href: "/methodology",
+    label: "方法论",
+    match: (p) => p.startsWith("/methodology"),
+    capability: "methodology",
+  },
+];
+
+const NAV = ALL_NAV.filter(
+  (item) => item.capability === undefined || hasCapability(item.capability),
+);
 
 export function AppHeader() {
   const pathname = usePathname();

@@ -20,15 +20,21 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type {
+  DataStatus,
   DataHealth,
+  CriterionSpec,
   EtfRow,
   FundDetail,
   FundListResponse,
   Manifest,
+  QueryContract,
   ScreenerSnapshot,
+  RunInfo,
   SearchIndex,
   ThermometerReading,
   StockDetail,
+  StrategyHit,
+  StrategySummary,
 } from "./types";
 
 /**
@@ -181,4 +187,68 @@ export function getPublishedCodes(): Set<string> {
  */
 function isSafeId(value: string): boolean {
   return /^[A-Za-z0-9._-]+$/.test(value) && !value.includes("..");
+}
+
+// ── 策略与方法论（仅工作台档案发布的产物）──────────────────────────────
+//
+// ★ 下面这组 reader 读的是 `strategies.json` / `methodology.json` /
+//   `contracts.json` —— 公开档案把三者都扣留了（见 `ui-profiles.json`）。
+//   因此**调用它们之前必须先确认能力存在**（`lib/route-guard.ts`），
+//   否则读到的是空数组而不是"没有这一页"：页面会渲染出一个空榜，
+//   而空榜看起来像"今天没有命中"，那是一种静默的错。
+
+/** 策略清单与命中（快照里合成一个文件，省掉一轮读取）。 */
+function readStrategies(): {
+  strategies: StrategySummary[];
+  status: DataStatus | null;
+  detail: Map<string, { hits: StrategyHit[]; run: RunInfo | null }>;
+} {
+  const payload = readSnapshot<{
+    strategies?: StrategySummary[];
+    detail?: { strategy_id: string; run: RunInfo | null; hits: StrategyHit[] }[];
+    status?: DataStatus;
+  }>("strategies.json");
+
+  const detail = new Map<string, { hits: StrategyHit[]; run: RunInfo | null }>();
+  for (const item of payload?.detail ?? []) {
+    detail.set(item.strategy_id, { hits: item.hits ?? [], run: item.run ?? null });
+  }
+  return {
+    strategies: payload?.strategies ?? [],
+    status: payload?.status ?? null,
+    detail,
+  };
+}
+
+export function getStrategies(): {
+  strategies: StrategySummary[];
+  status: DataStatus | null;
+} {
+  const { strategies, status } = readStrategies();
+  return { strategies, status };
+}
+
+export function getStrategyHits(strategyId: string): {
+  hits: StrategyHit[];
+  run: RunInfo | null;
+  status: DataStatus | null;
+} {
+  const { detail, status } = readStrategies();
+  const entry = detail.get(strategyId);
+  return { hits: entry?.hits ?? [], run: entry?.run ?? null, status };
+}
+
+/** 快照里真实存在的策略标识（`generateStaticParams` 用）。 */
+export function listStrategyIds(): string[] {
+  return readStrategies()
+    .strategies.map((item) => item.strategy_id)
+    .sort();
+}
+
+export function getMethodology(): CriterionSpec[] {
+  return readSnapshot<{ criteria: CriterionSpec[] }>("methodology.json")?.criteria ?? [];
+}
+
+export function getContracts(): QueryContract[] {
+  return readSnapshot<{ contracts: QueryContract[] }>("contracts.json")?.contracts ?? [];
 }
