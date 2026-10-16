@@ -502,7 +502,23 @@ export interface FundScoreRow {
   coverage: number;
   /** 同类排名（1 起）。 */
   rank: number | null;
+  /**
+   * **名次分母**：该类中参与排名的代表基金数。
+   *
+   * 与 `rank` 同源（都由同一份已排序集合派生），因此恒有
+   * `1 <= rank <= peer_count`。界面上的「第 N / M 名」里的 M 就是它。
+   */
   peer_count: number;
+  /**
+   * 该类别的**候选总数**（份额合并之前）。
+   *
+   * 与 `peer_count` 是两个不同的量：前者回答"这一类共有多少只基金"，
+   * 后者回答"名次一共有几档"。早先把两者合并成一个字段，
+   * 于是界面上的分母与名次来自不同集合 —— 那句「第 N / M 名」是错的。
+   *
+   * 可选：旧快照里没有这个字段（它随 `context` 一起落库）。
+   */
+  universe_size?: number;
   age_years: number;
   size: number | null;
   factors: FundFactorScore[];
@@ -626,6 +642,8 @@ export interface FundSearchDetail {
   score: number | null;
   rank: number | null;
   peer_count: number;
+  /** 类别候选总数（份额合并之前）；旧快照可能没有。 */
+  universe_size?: number;
 }
 
 /**

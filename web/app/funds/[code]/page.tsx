@@ -68,6 +68,14 @@ export default async function FundDetailPage({
           </Badge>
           <span className="text-[11.5px] text-fg-subtle">
             同类第 {detail.rank ?? "—"} / {fmtInt(detail.peer_count)} 名
+            {detail.universe_size && detail.universe_size > detail.peer_count ? (
+              <span
+                className="ml-1.5 text-fg-subtle"
+                title="本类候选基金总数（含同一策略的其它份额）；榜单每个策略只保留规模最大的一个份额"
+              >
+                （候选 {fmtInt(detail.universe_size)} 只含份额）
+              </span>
+            ) : null}
           </span>
           <span
             className="num text-[26px] font-semibold"

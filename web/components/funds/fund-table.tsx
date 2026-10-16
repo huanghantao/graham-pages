@@ -181,7 +181,11 @@ export function FundTable({
                       title={
                         row.score === null
                           ? "可得因子权重不足，不输出综合分"
-                          : `同类第 ${row.rank} / ${row.peer_count} 名`
+                          : `同类第 ${row.rank} / ${row.peer_count} 名` +
+                            (row.universe_size &&
+                            row.universe_size > row.peer_count
+                              ? `（本类候选 ${row.universe_size} 只，含同一策略的其它份额；榜单每个策略只留规模最大的一个份额）`
+                              : "")
                       }
                     >
                       {row.score === null ? "—" : fmt(row.score)}
