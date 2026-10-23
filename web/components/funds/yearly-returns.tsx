@@ -7,13 +7,32 @@
  *
  * 只看"近 5 年年化收益"会被单年爆发骗到。实测样本里有一只基金
  * 近 5 年累计收益在同类中最高，但逐年拆开后是
- * ``[+400%, −10%, −10%, −10%, −10%]`` —— 五年里四年在亏钱。
+ * ``[−10%, −10%, −10%, −10%, +400%]``（按时间升序）—— 五年里四年在亏钱。
  *
  * 一根根柱子把这件事实摆出来：**柱子的高度参差不齐，就说明业绩不稳**。
  * 数字（最差年份、跨度）能给出结论，而图能让人一眼看出形状。
  *
  * 逐年收益由**嵌套的累计收益**相除得到（上游接口只提供累计值，
  * 但近1年 ⊂ 近2年 ⊂ …，相邻两期相除即还原单年收益）。
+ *
+ * ## 横轴为什么是年份，且按时间升序
+ *
+ * 首版横轴是 ``1 2 3 4 5``，意为"第 N 年"，而数据是**近→远**排列的 ——
+ * 刻度从左到右看着像时间在前进，实际上越往右年代越早。这个矛盾在
+ * 纯数字刻度下不容易被察觉，一旦标上真实年份就立刻暴露（会出现
+ * 2026、2025、2024… 的倒序）。
+ *
+ * 因此这里做两条硬约束：
+ *
+ * 1. **刻度必须是后端给出的年份**，不能由前端按下标拼 —— 年份来自
+ *    每个窗口的结束日（见 ``ReturnSmoothness.year_labels``），前端拿不到
+ *    那个日期，自行推算必然编造。
+ * 2. **数据按时间升序渲染**（最早在左、最近在右）。这与站内其它时间序列
+ *    （财务趋势、估值曲线）一致，也是读者对横轴的默认预期。
+ *
+ * 年份标签**不是自然年**：问财只提供滚动 12 个月的嵌套累计收益，
+ * 所以每个柱覆盖的是"去年 10 月到今年 10 月"。图本身无法承担这个解释
+ * （它只负责把标签画在柱下），由页面脚注说明。
  *
  * ## 为什么数值必须**直接画在图上**
  *
@@ -41,9 +60,9 @@ import { fmt } from "@/lib/format";
 //: 详见下方 `LABEL_GAP` 的说明。
 const PLOT_HEIGHT = 128;
 
-//: 数值标签与柱顶的间距（像素）。
+//: 数值标签的高度（像素）。
 //:
-//: 标签高度（像素）。写进常量是为了能把余量算清楚，而不是靠目测试参数。
+//: 写进常量是为了能把余量算清楚，而不是靠目测试参数。
 const LABEL_HEIGHT = 11;
 
 //: 数值标签与柱顶的间距（像素）。
@@ -57,16 +76,25 @@ const LABEL_HEIGHT = 11;
 //: 负向同理：``64 + 42.7 + 4 + 11 = 121.7 < 128``。
 //:
 //: （首版取 112 时负向最深处是 108.3，虽然也「放得下」，
-//: 但第 5 年的标签已经贴到容器边缘 —— 视觉上像被裁掉了。
+//: 但最后一年的标签已经贴到容器边缘 —— 视觉上像被裁掉了。
 //: 余量要按「看起来舒服」而不只是「不溢出」来留。）
 const LABEL_GAP = 4;
 
 export function YearlyReturns({
   years,
+  labels,
   worst,
   spread,
 }: {
+  /** 逐年收益率（%），**按时间升序**（最早的一年在前）。 */
   years: number[];
+  /**
+   * 与 `years` 同序的年份标签（如 `"2022"`）。
+   *
+   * 缺项时该刻度留空 —— 宁可没有年份，也不回退成 `1 2 3 4 5`：
+   * 那串数字正是本次要修掉的、有方向歧义的刻度。
+   */
+  labels: string[];
   worst: number;
   spread: number;
 }) {
@@ -102,6 +130,7 @@ export function YearlyReturns({
     <div>
       <div className="flex items-stretch gap-1.5" style={{ height: PLOT_HEIGHT }}>
         {years.map((value, index) => {
+          const label = labels[index] ?? "";
           const positive = value >= 0;
           const raw = (Math.abs(value) / bound) * half;
           // 有实际数值的年份至少画 3px；真正的 0 不画（避免把 0 说成小涨）
@@ -134,7 +163,7 @@ export function YearlyReturns({
                   top: positive ? tip - LABEL_HEIGHT - LABEL_GAP : tip + LABEL_GAP,
                   color: positive ? "var(--fg-muted)" : "var(--fail)",
                 }}
-                title={`第 ${index + 1} 年 ${value > 0 ? "+" : ""}${fmt(value)}%`}
+                title={`${label ? `${label} 年 ` : ""}${value > 0 ? "+" : ""}${fmt(value)}%`}
               >
                 {value > 0 ? "+" : ""}
                 {fmt(value)}
@@ -144,14 +173,17 @@ export function YearlyReturns({
         })}
       </div>
       {/*
-        横轴刻度保持紧凑的 `1 2 3 4 5`。
-        首版写成「第 N 年」在窄视口下会折行，把一行清爽的刻度变成参差的
-        两行文本 —— 而「第 N 年」这个含义已由下方说明句交代，不必重复。
+        横轴：真实年份，与柱子一一对齐。
+        用 `whitespace-nowrap` 防止窄视口下 "2022" 被拆成两行 ——
+        四个数字本身不宽，折行只可能来自容器的默认换行策略。
       */}
       <div className="mt-1.5 flex gap-1.5">
         {years.map((_value, index) => (
-          <div key={index} className="num flex-1 text-center text-[9.5px] text-fg-subtle">
-            {index + 1}
+          <div
+            key={index}
+            className="num flex-1 whitespace-nowrap text-center text-[9.5px] text-fg-subtle"
+          >
+            {labels[index] ?? ""}
           </div>
         ))}
       </div>
@@ -159,8 +191,6 @@ export function YearlyReturns({
         最差年度 <span style={{ color: worst < 0 ? "var(--fail)" : "var(--pass)" }}>{fmt(worst)}%</span>
         <span className="mx-1.5 text-fg-subtle">·</span>
         跨度 {fmt(spread)}pp
-        <span className="mx-1.5 text-fg-subtle">·</span>
-        <span className="text-fg-subtle">横轴为「第 N 年」，非日历年</span>
       </p>
     </div>
   );

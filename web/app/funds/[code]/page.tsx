@@ -8,7 +8,7 @@ import { YearlyReturns } from "@/components/funds/yearly-returns";
 import { Badge, Card, CardBody, CardHeader } from "@/components/ui";
 import { getFundDetail, getFunds, getPublishedCodes, listFundCodes } from "@/lib/snapshot";
 import { cn } from "@/lib/cn";
-import { fmt, fmtInt } from "@/lib/format";
+import { fmt, fmtDate, fmtInt } from "@/lib/format";
 
 /**
  * 枚举快照里真实存在的基金详情页。
@@ -50,6 +50,7 @@ export default async function FundDetailPage({
   );
   const cumulative = detail.context.cumulative_returns ?? {};
   const drawdowns = detail.context.drawdowns ?? {};
+  const smoothness = detail.context.smoothness;
 
   return (
     <div className="space-y-5">
@@ -200,7 +201,7 @@ export default async function FundDetailPage({
         </CardBody>
       </Card>
 
-      {detail.context.smoothness ? (
+      {smoothness ? (
         <Card>
           <CardHeader
             title="逐年收益"
@@ -214,15 +215,22 @@ export default async function FundDetailPage({
               <strong className="text-fg-muted">柱子越参差，业绩越不稳</strong>。
             </p>
             <YearlyReturns
-              years={detail.context.smoothness.years}
-              worst={detail.context.smoothness.worst}
-              spread={detail.context.smoothness.spread}
+              years={smoothness.years}
+              labels={smoothness.year_labels ?? []}
+              worst={smoothness.worst}
+              spread={smoothness.spread}
             />
             <p className="border-t border-line/70 pt-2.5 text-[10.5px] leading-4 text-fg-subtle">
               逐年收益由<strong className="text-fg-muted">嵌套的累计收益</strong>相除得到
               （上游只提供累计值，但「近1年」是「近2年」的子区间，相邻两期相除即还原单年收益）。
               窗口固定为最近 5 年 —— 所有候选基金用同一窗口，
               否则「最差的一年」跨基金不可比。
+            </p>
+            <p className="text-[10.5px] leading-4 text-fg-subtle">
+              横轴按时间从左到右，标注的是每个<strong className="text-fg-muted">滚动 12 个月窗口的结束年份</strong>
+              {smoothness.window_end ? `（最近一年截至 ${fmtDate(smoothness.window_end)}）` : ""}，
+              不是自然年 —— 上游没有按自然年切分的收益序列，
+              逐年值也无法与基金平台的「年度收益」直接对照。
             </p>
           </CardBody>
         </Card>
