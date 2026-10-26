@@ -1,8 +1,8 @@
 import { ProveanceSection } from "@/components/health/section";
 import { BackLink } from "@/components/ui/back-link";
 import { Badge, Card, CardBody, CardHeader, EmptyState, Stat } from "@/components/ui";
-import { getDataHealth } from "@/lib/snapshot";
-import { fmtInt } from "@/lib/format";
+import { getDataHealth, getManifest } from "@/lib/snapshot";
+import { MARKET_UTC_OFFSET_LABEL, fmtInt, fmtTimestamp } from "@/lib/format";
 import type { TrustLevel } from "@/lib/types";
 
 export const metadata = { title: "数据可信度" };
@@ -24,6 +24,11 @@ export default async function HealthPage() {
   // 运行条数在发布时就已固化（`graham publish` 固定取 30 条）——
   // 静态站点上没有"按需多取几页"这回事。
   const health = await getDataHealth();
+  // 生成时刻取自 manifest 的 `data_generated_at`（**带时区的 UTC**），
+  // 而不是运行历史里的 `finished_at` —— 后者是库里的本地裸值，
+  // 在构建机（CI 为 UTC）上按 `new Date()` 解析会被当成本机时间，
+  // 显示出来的时刻会整体偏移一次时区。
+  const generatedAt = getManifest()?.data_generated_at ?? null;
 
   if (!health) {
     return (
@@ -77,6 +82,11 @@ export default async function HealthPage() {
               <Stat label="标的" value={fmtInt(latest.security_count)} size="sm" />
               <Stat label="观测" value={fmtInt(latest.observation_count)} size="sm" />
             </div>
+            <p className="mt-4 text-[12.5px] text-fg-muted">
+              数据生成于{" "}
+              <span className="num text-fg">{fmtTimestamp(generatedAt)}</span>
+              <span className="ml-1">（{MARKET_UTC_OFFSET_LABEL}）</span>
+            </p>
             {!latest.allows_scoring ? (
               <div className="mt-4 rounded-xl border border-fail/30 bg-fail-bg px-3.5 py-2.5 text-[12.5px] text-fail">
                 该批次未通过关键契约校验，<strong>已停止用于打分</strong>。

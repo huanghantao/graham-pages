@@ -110,6 +110,53 @@ export function moneyUnit(
   return base;
 }
 
+/**
+ * 数据市场的时区 —— A 股与港股都在 UTC+8。
+ *
+ * 为什么不用访问者时区：站点是**静态导出**，HTML 在构建期就已生成。
+ * 构建机（CI 是 UTC）与时区都参与渲染，若按"本地时区"格式化，同一份快照
+ * 在不同机器上会产出不同文本；而按访问者时区渲染需要客户端 JS，
+ * 页面在无 JS 时就只剩一个占位符。这里固定按数据市场时区渲染，
+ * 并把偏移**写进文案**（见 `MARKET_UTC_OFFSET_LABEL`）——
+ * 读者在哪个时区都不会误读。
+ */
+const MARKET_TIME_ZONE = "Asia/Shanghai";
+
+/** 与 :data:`MARKET_TIME_ZONE` 配套展示的偏移标签。 */
+export const MARKET_UTC_OFFSET_LABEL = "北京时间 UTC+8";
+
+/**
+ * 完整时刻：ISO 时间戳 → ``2026-10-26 23:12:15``（数据市场时区）。
+ *
+ * 与 :func:`fmtDate` 的分工：日期字段（如快照日 ``as_of``）只表达**哪一天**，
+ * 用 fmtDate；生成时刻需要精确到秒，用本函数。
+ *
+ * 无法解析的值**原样返回**而不是变成 ``—``：一个格式异常的时间戳应当被看见，
+ * 静默显示成"无"会让"数据缺失"与"格式写错"混为一谈。
+ */
+export function fmtTimestamp(iso: string | null | undefined): string {
+  if (!iso) return DASH;
+  const value = new Date(iso);
+  if (Number.isNaN(value.getTime())) return iso;
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: MARKET_TIME_ZONE,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(value);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return (
+    `${get("year")}-${get("month")}-${get("day")} ` +
+    `${get("hour")}:${get("minute")}:${get("second")}`
+  );
+}
+
 /** 日期：2026-10-13 → 2026/10/13 */
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return DASH;
