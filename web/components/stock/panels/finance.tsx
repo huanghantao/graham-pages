@@ -13,7 +13,15 @@ import { DASH, fmtMoney, fmtPercent, yearOf } from "@/lib/format";
 import type { StockDetail } from "@/lib/types";
 
 /** 趋势图的展示顺序（收入规模 → 盈利质量 → 杠杆） */
-const ORDER = ["net_income", "operating_cash_flow", "roe", "debt_ratio", "revenue"] as const;
+const ORDER = [
+  "net_income",
+  // 扣非紧随归母：两张图并排才能看出"账面利润里有多少来自主业"
+  "deducted_net_income",
+  "operating_cash_flow",
+  "roe",
+  "debt_ratio",
+  "revenue",
+] as const;
 
 export function FinancePanel({ detail }: { detail: StockDetail }) {
   // 金额类趋势图必须知道币种：A 股是人民币、港股是港元。

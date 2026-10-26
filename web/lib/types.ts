@@ -319,6 +319,25 @@ export interface TrendSeries {
   points: [string, number][];
 }
 
+/**
+ * 利润质量：**同一报告期**的扣非归母净利润 vs 归母净利润。
+ *
+ * 与 `margin` 里的闸门文案同源（后端 `profit_quality_signal` 一次推导、
+ * 两处使用），因此页面不需要自己判断"利润是不是主业赚的"。
+ * `ratio` 在归母非正时为 null —— 亏损公司的"利润含金量"不是一个比率问题。
+ */
+export interface ProfitQuality {
+  status: "operating_profit" | "operating_loss" | "unknown";
+  status_label: string;
+  deducted_net_income: number | null;
+  reported_net_income: number | null;
+  ratio: number | null;
+  period_end: string | null;
+  is_operating_loss: boolean;
+  note: string;
+  reason: string;
+}
+
 export interface NcavView {
   ncav_strict: number | null;
   ncav_loose: number | null;
@@ -391,6 +410,8 @@ export interface StockDetail {
     board: string | null;
   };
   key_metrics: Record<string, KeyMetric>;
+  /** 利润质量（扣非归母 vs 归母，同报告期配对）。 */
+  profit_quality: ProfitQuality;
   /** NCAV 的构成质量：流动资产里有多少是现金/应收款/存货。 */
   composition: NcavComposition;
   /** 所属市场的**数据能力画像**：哪些判据不适用或仅部分适用。 */
