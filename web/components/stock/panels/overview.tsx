@@ -17,7 +17,7 @@ import { KeyMetrics } from "@/components/stock/key-metrics";
 
 import { NcavComposition } from "./ncav-composition";
 import { DASH, fmt, fmtInt, fmtRatio } from "@/lib/format";
-import type { StockDetail } from "@/lib/types";
+import type { DimensionBreakdown, StockDetail } from "@/lib/types";
 
 /**
  * 严重级 → 徽标文案与配色。
@@ -45,17 +45,37 @@ function severityMeta(severity: string): SeverityMeta {
   return SEVERITY_META[severity] ?? { label: "中", tone: "warn", border: "border-warn/25" };
 }
 
+/**
+ * 取某个维度的分项。
+ *
+ * ★ **不再解析字符串键**。首版从扁平的 `margin.breakdown` 里按前缀切分，
+ * 再用 `key.split(".")` 取第二段当名称。
+ *
+ * 而那份扁平字典里除了分项得分，还混着 `cheapness.declared_coverage` 与
+ * `cheapness.weight.<分项>`（它们必须落盘，否则"某分项从未参与计算"
+ * 在几千行数据里看不出来）。于是界面把内部字段名当成了因子名：
+ * 实测 8,374 只个股**全部**出现了 `weight`、`declared_coverage` 这些词，
+ * 一屏里十几行、每行一个英文标识符，完全无法阅读。
+ *
+ * 现在直接读服务端下发的 `dimensions` —— 结构由产生它的一侧声明，
+ * 消费方不需要猜。
+ */
+function factorsOf(
+  dimensions: DimensionBreakdown[] | undefined,
+  name: string,
+): { label: string; value: number }[] {
+  const dimension = dimensions?.find((item) => item.name === name);
+  return (dimension?.factors ?? []).map((item) => ({
+    label: item.label,
+    value: item.value,
+  }));
+}
+
 export function OverviewPanel({ detail }: { detail: StockDetail }) {
   const margin = detail.margin;
-  const breakdown = margin?.breakdown ?? {};
 
-  const cheapParts = Object.entries(breakdown)
-    .filter(([key]) => key.startsWith("cheapness.") && !key.endsWith(".total"))
-    .map(([key, value]) => ({ label: LABELS[key] ?? key.split(".")[1]!, value }));
-
-  const qualityParts = Object.entries(breakdown)
-    .filter(([key]) => key.startsWith("quality.") && !key.endsWith(".total"))
-    .map(([key, value]) => ({ label: LABELS[key] ?? key.split(".")[1]!, value }));
+  const cheapParts = factorsOf(margin?.dimensions, "cheapness");
+  const qualityParts = factorsOf(margin?.dimensions, "quality");
 
   return (
     <div className="grid gap-5 lg:grid-cols-12">
@@ -259,17 +279,6 @@ export function OverviewPanel({ detail }: { detail: StockDetail }) {
 }
 
 /** 分项英文键 → 中文名 */
-const LABELS: Record<string, string> = {
-  "cheapness.valuation_percentile": "估值分位",
-  "cheapness.absolute_valuation": "绝对估值",
-  "cheapness.dividend_yield": "股息率",
-  "cheapness.ncav_discount": "NCAV 折价",
-  "quality.earnings_stability": "盈利稳定性",
-  "quality.financial_soundness": "财务稳健",
-  "quality.cash_flow_quality": "现金流质量",
-  "quality.return_quality": "回报质量",
-};
-
 /** 金额缩写（用于紧凑卡片） */
 function fmtMoneyShort(value: number | null): string {
   if (value === null) return DASH;

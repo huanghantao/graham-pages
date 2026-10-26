@@ -44,7 +44,12 @@ export function FundTable({
 
   // 只显示对该类别有意义的因子（纯债不显示持仓因子）
   const categoryFactors = useMemo(
-    () => factors.filter((f) => f.categories.length === 0 || f.categories.includes(group.category)),
+    () =>
+      factors.filter(
+        (f) =>
+          f.categories.length === 0 ||
+          f.categories.some((item) => item.key === group.category),
+      ),
     [factors, group.category],
   );
 
@@ -268,7 +273,7 @@ export function FactorLegend({ factors }: { factors: FundFactorSpec[] }) {
                     {spec.direction === "lower_better" ? " 越小越好" : " 越大越好"}
                     {spec.min_age_years > 0 ? ` · 需成立满 ${spec.min_age_years} 年` : ""}
                     {spec.categories.length > 0
-                      ? ` · 仅 ${spec.categories.map(categoryLabel).join("/")}`
+                      ? ` · 仅 ${spec.categories.map((item) => item.label).join("/")}`
                       : " · 全部类别"}
                   </span>
                 </dt>
@@ -284,13 +289,3 @@ export function FactorLegend({ factors }: { factors: FundFactorSpec[] }) {
   );
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  equity_hybrid: "偏股混合",
-  bond_hybrid: "偏债混合",
-  pure_bond_medium: "中长期纯债",
-  pure_bond_short: "短期纯债",
-};
-
-function categoryLabel(key: string): string {
-  return CATEGORY_LABELS[key] ?? key;
-}

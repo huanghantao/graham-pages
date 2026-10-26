@@ -304,7 +304,7 @@ export default async function HomePage() {
             <EntryCard
               href="/funds"
               title="基金"
-              description="多因子评分 × 四类分组，同类内比较。含低成本宽基 ETF 方案"
+              description="多因子评分 × 按类别分组，同类内比较。含低成本宽基 ETF 方案"
             />
           </div>
         </>

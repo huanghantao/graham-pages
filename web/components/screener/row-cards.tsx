@@ -22,9 +22,17 @@ import type { ScoreRow } from "@/lib/types";
 import { QUADRANT_META } from "./filters";
 import { TurnoverCell } from "./turnover-cell";
 
+/**
+ * 筛选结果的移动端卡片列表。
+ *
+ * ★ **不要在这里加 `lg:hidden`。** 桌面/移动的切换由调用处的**整个容器**
+ * 负责（见 `screener-client` 里的说明）：隐藏类若只挂在这个列表上，
+ * 列表的分页按钮（由 `ProgressiveList` 渲染、与本列表是兄弟节点）
+ * 就会在桌面端残留成一个孤立的「显示更多」。
+ */
 export function ResultCards({ rows }: { rows: ScoreRow[] }) {
   return (
-    <ul className="space-y-2.5 lg:hidden">
+    <ul className="space-y-2.5">
       {rows.map((row) => {
         const meta = QUADRANT_META[row.quadrant];
         return (

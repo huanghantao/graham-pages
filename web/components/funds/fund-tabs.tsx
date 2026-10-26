@@ -5,8 +5,9 @@
  *
  * ## 为什么必须切换而不是继续堆叠
  *
- * 四类基金 + ETF 原先垂直堆叠，手机端实测 **48.6 屏**：
+ * 基金类别 + ETF 原先垂直堆叠，手机端实测 **48.6 屏**：
  * 想看「中长期纯债」要先滚过 22,000px（26 屏）。
+ * 类别扩到七类之后，堆叠方案会变成 80 屏以上 —— 切换不是优化，是唯一可用形态。
  *
  * ## 更重要的原因：堆叠会诱导一个**错误比较**
  *
@@ -50,17 +51,6 @@ interface Tab {
   note: string;
 }
 
-const CATEGORY_NOTES: Record<string, string> = {
-  equity_hybrid:
-    "股票仓位较高（实测 51%~99%），波动与收益都最大。适合能承受大幅回撤、投资期限较长的人。",
-  bond_hybrid:
-    "以债券为主、配一部分股票（实测股票仓位 0%~50%）。用股票部分争取超额收益，波动低于偏股。",
-  pure_bond_medium:
-    "只投债券，不持有股票，因此不参与持仓类因子。久期较长，对利率变化更敏感。",
-  pure_bond_short:
-    "只投债券且久期较短，利率敏感度最低。收益空间也更小，通常作为现金管理工具。",
-};
-
 export function FundTabs({
   groups,
   factors,
@@ -79,9 +69,16 @@ export function FundTabs({
       key: group.category,
       label: group.label,
       count: group.count,
-      note: CATEGORY_NOTES[group.category] ?? "",
+      // 说明由服务端按类别下发（`FundGroup.note`）。前端硬编码那张表
+      // 在新增类别时会静默留下一行空白说明 —— 而空白看起来像是"这类没有备注"。
+      note: group.note,
     })),
-    { key: ETF_KEY, label: "低成本指数", count: etfs.length, note: "" },
+    {
+      key: ETF_KEY,
+      label: "低成本指数",
+      count: etfs.length,
+      note: "按跟踪指数分组，同一指数下比管理费率 —— 费率是长期收益最确定的那个变量。",
+    },
   ];
 
   //: 默认标签的 key（即第一个标签）。抽成独立变量是为了得到**稳定的依赖值**：
@@ -145,13 +142,17 @@ export function FundTabs({
         需要横向滑动才能发现，是拿可用性换整洁 —— 尤其"低成本指数"
         完全藏在屏幕外，用户根本不知道它存在。
 
-        改为 `grid` 自动换行：手机上两行（3 + 2），桌面一行 5 个。
-        全部标签始终可见，不需要任何滚动或提示。
+        改为 `grid` 自动换行：手机两列、平板四列、桌面八列 ——
+        七类基金 + ETF 在桌面正好铺满一行，任何尺寸下都不需要横向滚动。
+
+        ★ 列数随标签数量调整过：原先写死 `lg:grid-cols-5`，
+        加到 8 个标签后会折成 5 + 3 两行，最后一行只占一半宽度，
+        视觉上像是"标签没排完"。
       */}
       <div
         role="tablist"
         aria-label="基金类别"
-        className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-bg-elevated p-1 shadow-card sm:grid-cols-3 lg:grid-cols-5"
+        className="grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-bg-elevated p-1 shadow-card sm:grid-cols-4 lg:grid-cols-8"
       >
         {tabs.map((tab) => {
           const selected = tab.key === active;
@@ -191,7 +192,7 @@ export function FundTabs({
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11.5px] leading-5">
         <p className="text-fg-muted">
           <strong className="text-fg">{current.label}</strong>
-          {current.key === ETF_KEY ? "：按跟踪指数分组的低成本方案。" : `：${current.note}`}
+          {`：${current.note}`}
         </p>
         <p className="text-fg-subtle">
           分数只在本类别内可比 —— 跨类别的分数不做对照。

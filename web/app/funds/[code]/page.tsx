@@ -46,10 +46,16 @@ export default async function FundDetailPage({
   const byKey = new Map(detail.factors.map((f) => [f.key, f]));
   const na = new Map(detail.not_applicable.map((item) => [item.key, item.reason]));
   const specs = (listing?.factors ?? []).filter(
-    (spec) => spec.categories.length === 0 || spec.categories.includes(detail.category),
+    (spec) =>
+      spec.categories.length === 0 ||
+      spec.categories.some((item) => item.key === detail.category),
   );
   const cumulative = detail.context.cumulative_returns ?? {};
   const drawdowns = detail.context.drawdowns ?? {};
+  // 被剔除的回撤原始值（上游返回的结构性不可能的值）。
+  // 必须单独取出：这类格子不能显示成"—"（那与"上游没给数据"无法区分），
+  // 也不能显示成原值（那会让相邻两期的数字自相矛盾）。
+  const rejectedDrawdowns = detail.context.rejected_drawdowns ?? {};
   const smoothness = detail.context.smoothness;
 
   return (
@@ -64,7 +70,19 @@ export default async function FundDetailPage({
           </p>
         </div>
         <div className="flex items-baseline gap-3">
-          <Badge tone={detail.category === "equity_hybrid" ? "accent" : "neutral"}>
+          {/*
+            按「是否持股」分色，而不是钉死某一个类别。
+            原先写的是 `category === "equity_hybrid"`，七类之后
+            灵活配置与二级债基同样持股却都是中性色 —— 视觉上把
+            四个持股类别说成了三个不同类别。
+          */}
+          <Badge
+            tone={
+              (listing?.groups ?? []).find((g) => g.category === detail.category)?.holds_equity
+                ? "accent"
+                : "neutral"
+            }
+          >
             {detail.category_label}
           </Badge>
           <span className="text-[11.5px] text-fg-subtle">
@@ -99,10 +117,25 @@ export default async function FundDetailPage({
       <Card>
         <CardHeader title="评分构成" hint={`可得因子权重 ${(detail.coverage * 100).toFixed(0)}%`} />
         <CardBody className="space-y-3 pt-4">
-          {detail.score === null && detail.notes.length > 0 ? (
-            <p className="rounded-lg border border-warn/25 bg-warn-bg px-3 py-2 text-[11.5px] leading-5 text-fg-muted">
-              {detail.notes[0]}
-            </p>
+          {/*
+            ★ 备注**始终**渲染，不只是"没有综合分"时。
+
+            原先的条件是 `score === null && notes.length > 0` —— 于是
+            "回撤数据异常，已剔除" 这类说明在一只有分的基金页面上永远看不见，
+            而它恰恰是最该被看到的一类：用户看到某个因子不可用，
+            却不知道那是"上游没给"还是"上游给了矛盾的数据"。
+          */}
+          {detail.notes.length > 0 ? (
+            <div className="space-y-1.5">
+              {detail.notes.map((note) => (
+                <p
+                  key={note}
+                  className="rounded-lg border border-warn/25 bg-warn-bg px-3 py-2 text-[11.5px] leading-5 text-fg-muted"
+                >
+                  {note}
+                </p>
+              ))}
+            </div>
           ) : null}
           <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 lg:grid-cols-4">
             {specs.map((spec) => (
@@ -227,7 +260,8 @@ export default async function FundDetailPage({
               否则「最差的一年」跨基金不可比。
             </p>
             <p className="text-[10.5px] leading-4 text-fg-subtle">
-              横轴按时间从左到右，标注的是每个<strong className="text-fg-muted">滚动 12 个月窗口的结束年份</strong>
+              横轴<strong className="text-fg-muted">左边是最近的一年</strong>，向右依次回溯；
+              标注的是每个滚动 12 个月窗口的<strong className="text-fg-muted">结束年份</strong>
               {smoothness.window_end ? `（最近一年截至 ${fmtDate(smoothness.window_end)}）` : ""}，
               不是自然年 —— 上游没有按自然年切分的收益序列，
               逐年值也无法与基金平台的「年度收益」直接对照。
@@ -259,8 +293,21 @@ export default async function FundDetailPage({
                       <td className="num py-2 text-right">
                         {ret === undefined ? "—" : `${fmt(ret)}%`}
                       </td>
-                      <td className="num py-2 text-right text-warn">
-                        {dd === undefined ? "—" : `${fmt(dd)}%`}
+                      <td className="num py-2 text-right">
+                        {dd === undefined ? (
+                          rejectedDrawdowns[years] !== undefined ? (
+                            <span
+                              className="text-[10.5px] text-fail"
+                              title={`上游报告 ${fmt(rejectedDrawdowns[years])}%，该值结构性不可能，已剔除`}
+                            >
+                              数据异常
+                            </span>
+                          ) : (
+                            "—"
+                          )
+                        ) : (
+                          <span className="text-warn">{fmt(dd)}%</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -271,6 +318,13 @@ export default async function FundDetailPage({
               累计收益为<strong>复权</strong>口径（含分红）。未复权口径会系统性低估分红基金 ——
               实测同批基金中最大差 8.34 个百分点 / 3 年。
             </p>
+            {Object.keys(rejectedDrawdowns).length > 0 ? (
+              <p className="mt-1.5 text-[10.5px] leading-4 text-fail">
+                标为「数据异常」的期间：上游返回值与其它期间自相矛盾
+                （如超过该类别的结构上限，或比更短窗口的回撤还小），
+                已剔除、不参与评分。悬停可看原始值。
+              </p>
+            ) : null}
           </CardBody>
         </Card>
 

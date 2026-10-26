@@ -1,5 +1,5 @@
 {
-  "note": "发布档案 —— 同一套前端面向不同受众时的裁剪规则。本文件是 Python 引擎与 TypeScript UI 共用的唯一事实源，两侧都读它，因此不存在跨语言漂移。改这里即同时改变两侧行为。",
+  "note": "发布档案 —— 同一套前端面向不同受众时的裁剪规则。本文件是 Python 引擎与 TypeScript UI 共用的唯一事实源，两侧都读它，因此不存在跨语言漂移。改这里即同时改变两侧行为。\n\nunbounded_scope 决定**收录范围**：true 表示不限量（发布全部有评分的标的），false/缺省表示按 graham.publish 的 DEFAULT_STOCK_PER_MARKET / DEFAULT_FUND_PER_CATEGORY 裁剪。收录范围与「发布哪些产物」同属面向受众的裁剪，因此放在同一份档案里，而不是散落在 CLI 参数的缺省值上。",
   "default_profile": "workbench",
   "profiles": {
     "workbench": {
@@ -7,14 +7,20 @@
       "server": true,
       "withheld_artifacts": [],
       "redact_upstream_identity": false,
-      "strip_criterion_sources": false
+      "strip_criterion_sources": false,
+      "unbounded_scope": true
     },
     "public": {
       "label": "公开站（只读展示，裁剪后）",
       "server": false,
-      "withheld_artifacts": ["strategies.json", "methodology.json", "contracts.json"],
+      "withheld_artifacts": [
+        "strategies.json",
+        "methodology.json",
+        "contracts.json"
+      ],
       "redact_upstream_identity": true,
-      "strip_criterion_sources": true
+      "strip_criterion_sources": true,
+      "unbounded_scope": false
     }
   }
 }

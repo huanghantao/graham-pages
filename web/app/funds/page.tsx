@@ -11,7 +11,7 @@ import { fmtInt } from "@/lib/format";
 export const metadata: Metadata = {
   title: "基金",
   description:
-    "多因子基金评分：收益、回撤、持仓质量与结构，在同类内做百分位归一后加权。四类基金分别成榜，不跨类比较。",
+    "多因子基金评分：收益、回撤、持仓质量与结构，在同类内做百分位归一后加权。每类基金分别成榜，不跨类比较。",
 };
 
 /**
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
  *
  * 早期版本把「这个模型是什么」「入池门槛」「评分模型」三张说明卡
  * 放在榜单**之前**，手机端要滚 1,707px（2 屏）才看到第一张榜。
- * 而四类基金又垂直堆叠，整页 48.6 屏 ——
+ * 而各类基金又垂直堆叠，整页 48.6 屏 ——
  * 想看「中长期纯债」要先滚过 22,000px。
  *
  * 现在：
@@ -57,7 +57,7 @@ export default async function FundsPage() {
           用长期收益、回撤、持仓质量与结构给基金打分。每个因子在
           <strong className="text-fg">同类内</strong>换算为百分位再加权 ——
           因为「年化 5%」对纯债基金是优秀、对偏股基金是平庸，
-          跨类别的绝对比较没有意义。因此四类基金<strong className="text-fg">分别成榜</strong>。
+          跨类别的绝对比较没有意义。因此每类基金<strong className="text-fg">分别成榜</strong>。
         </p>
       </div>
 
@@ -105,7 +105,7 @@ export default async function FundsPage() {
             <strong className="text-fg">分数只在本类别内可比</strong>。
             纯债榜首的 97 分不等于它比偏股榜首的 92 分更值得买，
             两者都只是「各自类别里最强的那一批」。选择哪一类取决于你的风险承受能力，
-            那是本模型回答不了的问题。这也是为什么四类榜<strong className="text-fg-muted">用切换而非堆叠</strong> ——
+            那是本模型回答不了的问题。这也是为什么各类榜<strong className="text-fg-muted">用切换而非堆叠</strong> ——
             堆叠会让滚动时自然产生跨类别比较。
           </p>
         </div>

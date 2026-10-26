@@ -121,6 +121,37 @@ export interface CriteriaReport {
   results: CriterionResult[];
 }
 
+/**
+ * 安全边际分解里的一个分项。
+ *
+ * 这是**服务端下发的结构化形态**，不是从扁平 `breakdown` 解析出来的。
+ * 早先前端拿 `Record<string, number>` 自己按字符串前缀切分，于是把
+ * `cheapness.weight.absolute_valuation` 截成了 `weight`、
+ * 把 `cheapness.declared_coverage` 当成了因子 —— 实测 8,374 只个股的
+ * 「安全边际分解」里全是这类内部字段名。结构该由产生它的一侧声明。
+ */
+export interface FactorBreakdown {
+  key: string;
+  /** 分项中文名，由服务端随权重表一起声明。 */
+  label: string;
+  /** 分项得分 [0, 100]。 */
+  value: number;
+  /** 实际生效权重（重新归一之后）；未参与计算时为 null（≠ 权重为 0）。 */
+  weight: number | null;
+}
+
+/** 一个维度的分解：便宜度或质量度。 */
+export interface DimensionBreakdown {
+  name: string;
+  /** 维度中文名。 */
+  label: string;
+  /** 维度总分；不可用时为 null。 */
+  total: number | null;
+  /** 声明权重中实际可用的占比 [0, 1]。 */
+  coverage: number;
+  factors: FactorBreakdown[];
+}
+
 export interface MarginOfSafety {
   cheapness: number | null;
   quality: number | null;
@@ -130,7 +161,10 @@ export interface MarginOfSafety {
   quadrant: Quadrant;
   quadrant_label: string;
   coverage: number;
+  /** 审计形态的扁平明细（含生效权重与覆盖率）。界面**不要**直接渲染它。 */
   breakdown: Record<string, number>;
+  /** 面向展示的结构化分解。界面渲染这个。 */
+  dimensions: DimensionBreakdown[];
   notes: string[];
 }
 
@@ -466,13 +500,26 @@ export interface FundFactorScore {
 }
 
 /** 因子的声明（由服务端下发，前端不硬编码口径）。 */
+/**
+ * 因子适用的类别。
+ *
+ * 带 `label` 而不是只给枚举值：前端因此**不需要**维护
+ * 「枚举 → 中文」的映射表。那张表在新增类别时会被漏改，
+ * 而漏改的症状是界面上出现 `bond_l1` 这样的英文键名。
+ */
+export interface FactorCategoryRef {
+  key: string;
+  label: string;
+}
+
 export interface FundFactorSpec {
   key: string;
   label: string;
   weight: number;
   direction: "higher_better" | "lower_better";
   min_age_years: number;
-  categories: string[];
+  /** 空数组表示「全部类别适用」。 */
+  categories: FactorCategoryRef[];
   description: string;
   /** 原始值的展示单位后缀（`"%"` / `"pp"` / `""`），由服务端声明。 */
   display_unit: string;
@@ -582,13 +629,28 @@ export interface FundScoreRow {
     manager_tenure: number | null;
     holdings_coverage: number;
     cumulative_returns: Record<string, number>;
+    /** 回撤率（%），键是年数字符串。**已剔除**结构性不可能的值。 */
     drawdowns: Record<string, number>;
+    /**
+     * 被剔除的回撤原始值，键是年数字符串。
+     *
+     * 存在它是因为"回撤不可用"有两种成因：上游没给数据，或上游给了
+     * 自相矛盾的数据。后者说明净值序列本身有问题，需要在界面上说清 ——
+     * 只显示 "—" 会让这两种情况看起来一样。
+     */
+    rejected_drawdowns?: Record<string, number>;
   };
 }
 
 export interface FundGroup {
   category: string;
   label: string;
+  /** 上游「投资类型二级分类」的精确取值。 */
+  upstream_name: string;
+  /** 一句话定位：这类基金是什么、适合谁。由服务端下发，前端不硬编码。 */
+  note: string;
+  /** 该类基金是否把股票当作投资标的（决定是否显示持仓类因子）。 */
+  holds_equity: boolean;
   count: number;
   rows: FundScoreRow[];
 }

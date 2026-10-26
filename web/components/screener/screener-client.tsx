@@ -397,13 +397,26 @@ export function ScreenerClient({
           </Card>
         ) : (
           <>
-            {/* 移动端：卡片（渐进加载 —— 268 条全渲染在手机上高 79,154px）*/}
-            <ProgressiveList
-              items={filtered}
-              unit="条"
-              resetKey={resetSignature}
-              render={(visible) => <ResultCards rows={visible} />}
-            />
+            {/* 移动端：卡片（渐进加载 —— 268 条全渲染在手机上高 79,154px）
+
+                ★ `lg:hidden` 必须包在**整个列表**外面，不能挂在卡片容器上。
+
+                缺陷经过：「显示更多」按钮是 `ProgressiveList` 自己渲染的，
+                与卡片列表是**兄弟节点**。原先隐藏类写在内层 `<ul>` 上，
+                于是桌面端卡片消失了、按钮却留了下来 ——
+                表格上方因此多出一个孤立的「显示更多（还有 8,334 条）」，
+                而表尾还有一个真的，用户以为重复渲染了。
+
+                隐藏"移动端视图"时，要连它的分页控件一起隐藏：
+                控件也是这个视图的一部分。 */}
+            <div className="lg:hidden">
+              <ProgressiveList
+                items={filtered}
+                unit="条"
+                resetKey={resetSignature}
+                render={(visible) => <ResultCards rows={visible} />}
+              />
+            </div>
 
             {/* 桌面：表格（同样渐进加载 —— 268 行全渲染有 25 屏）*/}
             <Card className="hidden overflow-hidden lg:block lg:[&>div]:overflow-visible">
