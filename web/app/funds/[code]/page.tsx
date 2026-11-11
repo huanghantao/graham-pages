@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/ui/back-link";
-import { FactorRow } from "@/components/funds/factor-bar";
+import { FactorRow, FactorRowLegend } from "@/components/funds/factor-bar";
+import { WeightComposition } from "@/components/funds/weight-composition";
 import { HolderBar } from "@/components/funds/holder-bar";
 import { YearlyReturns } from "@/components/funds/yearly-returns";
 import { Badge, Card, CardBody, CardHeader } from "@/components/ui";
@@ -137,6 +138,9 @@ export default async function FundDetailPage({
               ))}
             </div>
           ) : null}
+          {/* 卡片标题已经写明"评分构成"，因此区块不再重复标题。 */}
+          <WeightComposition factors={specs} />
+          <FactorRowLegend />
           <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 lg:grid-cols-4">
             {specs.map((spec) => (
               <FactorRow

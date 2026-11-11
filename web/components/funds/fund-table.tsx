@@ -21,7 +21,8 @@ import { cn } from "@/lib/cn";
 import { fmt, fmtInt } from "@/lib/format";
 import type { FundFactorSpec, FundGroup } from "@/lib/types";
 
-import { CoverageNote, FactorRow } from "./factor-bar";
+import { CoverageNote, FactorRow, FactorRowLegend } from "./factor-bar";
+import { WeightComposition } from "./weight-composition";
 
 type SortKey = "rank" | "size" | "age";
 
@@ -96,6 +97,10 @@ export function FundTable({
             ))}
           </div>
         </div>
+
+        {/* 权重每类别披露一次，而不是逐只重复（理由见 lib/fund-factors.ts）。 */}
+        <WeightComposition factors={categoryFactors} heading="评分构成" />
+        <FactorRowLegend />
 
         <ul className="divide-y divide-line/50">
           {rows.slice(0, limit).map((row) => {
