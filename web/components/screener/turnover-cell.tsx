@@ -18,17 +18,40 @@ import { cn } from "@/lib/cn";
 const UNTRADEABLE = 1e5; //  10 万：几乎无法交易
 const THIN = 1e6; // 100 万：建仓困难
 
+
 export function TurnoverCell({
   value,
   market,
+  unassessedLabel,
   className,
 }: {
   value: number | null;
   /** 市场（决定币种：A 股人民币、港股港元）。 */
   market?: string;
+  /**
+   * 值为空**是因为这项没被复核**时，缺失指标的中文名（如"近20日日均成交额"）。
+   *
+   * 与"没有这个数"必须分开呈现：`—` 会被读成"这只票没有该项"，而实际是
+   * "这次没拿到、因此不知道"。实测港股有一批标的的上游不再返回成交额，
+   * 它们恰恰是流动性最差的那一端 —— 若在此处退化成 `—`，名单上最该
+   * 被警惕的行反而最干净。
+   *
+   * 文案由服务端载荷提供（见 `lib/unassessed.ts`），组件不自带词表。
+   */
+  unassessedLabel?: string;
   className?: string;
 }) {
   if (value === null || value === undefined) {
+    if (unassessedLabel) {
+      return (
+        <span
+          className={cn("text-[11px] text-fg-subtle", className)}
+          title={`缺少「${unassessedLabel}」：数据不足，未能复核（不参与扣分）`}
+        >
+          未复核
+        </span>
+      );
+    }
     return <span className={cn("num text-fg-subtle", className)}>{DASH}</span>;
   }
 

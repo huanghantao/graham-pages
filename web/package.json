@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "test": "node --test lib/fund-factors.test.ts"
+    "test": "node --test lib/fund-factors.test.ts lib/unassessed.test.ts"
   },
   "dependencies": {
     "next": "15.5.4",

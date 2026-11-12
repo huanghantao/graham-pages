@@ -17,7 +17,7 @@ import { KeyMetrics } from "@/components/stock/key-metrics";
 
 import { NcavComposition } from "./ncav-composition";
 import { DASH, fmt, fmtInt, fmtRatio } from "@/lib/format";
-import type { DimensionBreakdown, StockDetail } from "@/lib/types";
+import type { DimensionBreakdown, StockDetail, UnassessedSignal } from "@/lib/types";
 
 /**
  * 严重级 → 徽标文案与配色。
@@ -37,12 +37,112 @@ const SEVERITY_META: Record<string, SeverityMeta> = {
   critical: { label: "严重", tone: "fail", border: "border-fail/35 bg-fail-bg/40" },
   high: { label: "高", tone: "fail", border: "border-fail/25" },
   medium: { label: "中", tone: "warn", border: "border-warn/25 bg-warn-bg/40" },
+  // advisory：覆盖市场太广、已被实测命中率降级的信号。展示但不扣分 ——
+  // 若仍按原层级显示，用户会以为它还在影响排序。
+  advisory: { label: "仅展示", tone: "neutral", border: "border-line/70" },
   info: { label: "提示", tone: "neutral", border: "border-line/70" },
 };
 
 /** 未知严重级按「中」呈现（保守：不把未知当无害）。 */
 function severityMeta(severity: string): SeverityMeta {
   return SEVERITY_META[severity] ?? { label: "中", tone: "warn", border: "border-warn/25" };
+}
+
+/**
+ * 该标的本批次**未能复核**的信号。
+ *
+ * `?? []` 不是多余的防御：快照是静态产物，代码与数据分两次发布，
+ * 站点会先拿到新代码、后拿到新快照，旧快照里没有这个键。
+ */
+function unassessedOf(detail: StockDetail): UnassessedSignal[] {
+  return detail.unassessed_signals ?? [];
+}
+
+/**
+ * 雷区卡片的角标：**三态**，不是两态。
+ *
+ * 命中数只说了一半的事实 —— 另一半是"有多少项根本没复核成"。
+ * 只报"未命中"会把数据缺失读成清白，而数据缺失恰恰是港股流动性
+ * 信号的常态（一次上游收窄即让 584 只标的失去成交额）。
+ */
+function riskHint(detail: StockDetail): string {
+  const hit = detail.risk_flags.length;
+  const blind = unassessedOf(detail).length;
+  const head = hit === 0 ? "未命中" : `${fmtInt(hit)} 项`;
+  return blind === 0 ? head : `${head} · ${fmtInt(blind)} 项未复核`;
+}
+
+/**
+ * 没有任何命中时的说明。
+ *
+ * 两种情况必须分开说：全部复核过、都没命中（这是结论）；与有信号没能
+ * 复核（这是缺口）。后者不能借用前者的措辞 —— "未命中监管或财务异常信号"
+ * 在被掩盖 12 分信号的情况下是一句误导。
+ */
+function RiskClearNotice({ unassessed }: { unassessed: UnassessedSignal[] }) {
+  if (unassessed.length === 0) {
+    return (
+      <Notice>
+        未命中监管或财务异常信号。
+        <span className="mt-1 block text-fg-subtle">
+          注意：这<strong className="text-fg-muted">不等于没有风险</strong>
+          ，只表示已采集的信号未命中；部分信号本平台取不到（见「溯源」页）。
+        </span>
+      </Notice>
+    );
+  }
+  return (
+    <Notice tone="warn" title="数据不足，未复核">
+      本批次有 {fmtInt(unassessed.length)} 项信号没取到输入，因此
+      <strong className="text-fg-muted">既不能说命中，也不能说通过</strong>。
+      <span className="mt-1 block text-fg-subtle">
+        缺失的数据不参与扣分（缺数据不等于有风险），但也不代表这只标的干净。
+        具体缺了什么见下方清单。
+      </span>
+    </Notice>
+  );
+}
+
+/**
+ * 未能复核的信号清单。
+ *
+ * 与命中列表**视觉上明显不同**：虚线边框、中性配色、不打勾不打叉。
+ * 这些项既不是问题也不是结论，把它们渲染成"风险"或"无害"的任何一种，
+ * 都会让页面替数据说话。
+ */
+function UnassessedList({
+  unassessed,
+  className,
+}: {
+  unassessed: UnassessedSignal[];
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <p className="mb-2 text-[11.5px] text-fg-subtle">
+        未能复核（数据不足，不参与扣分）
+      </p>
+      <ul className="space-y-1.5">
+        {unassessed.map((item) => {
+          const meta = severityMeta(item.severity);
+          return (
+            <li
+              key={item.signal}
+              className="rounded-lg border border-dashed border-line/70 px-3 py-2"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={meta.tone}>{meta.label}</Badge>
+                <span className="text-[12.5px] text-fg-muted">{item.title}</span>
+              </div>
+              <p className="num mt-1 text-[11px] text-fg-subtle">
+                缺少「{item.missing_label ?? item.missing_metric}」
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 /**
@@ -224,19 +324,10 @@ export function OverviewPanel({ detail }: { detail: StockDetail }) {
 
       {/* 雷区摘要 */}
       <Card className="lg:col-span-7">
-        <CardHeader
-          title="雷区信号"
-          hint={detail.risk_flags.length === 0 ? "未命中" : `${fmtInt(detail.risk_flags.length)} 项`}
-        />
+        <CardHeader title="雷区信号" hint={riskHint(detail)} />
         <CardBody className="pt-4">
           {detail.risk_flags.length === 0 ? (
-            <Notice>
-              未命中监管或财务异常信号。
-              <span className="mt-1 block text-fg-subtle">
-                注意：这<strong className="text-fg-muted">不等于没有风险</strong>
-                ，只表示已采集的信号未命中；部分信号本平台取不到（见「溯源」页）。
-              </span>
-            </Notice>
+            <RiskClearNotice unassessed={unassessedOf(detail)} />
           ) : (
             <ul className="space-y-2.5">
               {detail.risk_flags.map((flag) => {
@@ -272,6 +363,12 @@ export function OverviewPanel({ detail }: { detail: StockDetail }) {
               })}
             </ul>
           )}
+          {unassessedOf(detail).length ? (
+            <UnassessedList
+              unassessed={unassessedOf(detail)}
+              className={detail.risk_flags.length ? "mt-4 border-t border-line/70 pt-4" : "mt-4"}
+            />
+          ) : null}
         </CardBody>
       </Card>
     </div>

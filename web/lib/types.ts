@@ -311,6 +311,8 @@ export interface ScoreRow {
   price_change_1d: number | null;
   price_change_1m: number | null;
   price_change_1y: number | null;
+  /** 未能复核的风险信号；缺键即没有盲区（见 `StrategyHit.unassessed_signals`）。 */
+  unassessed_signals?: UnassessedSignal[];
 }
 
 export interface TrendSeries {
@@ -358,8 +360,11 @@ export interface NcavView {
 export interface RiskFlag {
   code: string;
   flag_code: string;
-  /** `info` 为"仅提示、不参与扣分"（如港股 GEM 板块属性）。 */
-  severity: "critical" | "high" | "medium" | "info";
+  /**
+   * `advisory` 为"覆盖市场太广、已被实测命中率降级"的信号，
+   * `info` 为"仅提示、不参与扣分"（如港股 GEM 板块属性）。
+   */
+  severity: "critical" | "high" | "medium" | "advisory" | "info";
   severity_label?: string;
   title: string;
   detail: string;
@@ -395,6 +400,29 @@ export interface ProvenanceEntry {
   warnings: string[];
 }
 
+/**
+ * 一个**未能复核**的雷区信号。
+ *
+ * 与 `RiskFlag` 是两个答案，不是同一种东西的两种写法：
+ * `RiskFlag` 说"看到了、而且是风险"，本类型说"这次没看到、所以不知道"。
+ *
+ * 它**不参与扣分** —— 缺数据不等于有风险；但它也**不是"复核通过"**。
+ * 界面必须把它显式渲染出来，否则"没有旗帜"会被读成"清白"，
+ * 而数据缺失的标的恰好就落在这个误读里。
+ */
+export interface UnassessedSignal {
+  code: string;
+  /** 信号标识，与 `RiskFlag.flag_code` 同一命名空间。 */
+  signal: string;
+  /** 若能复核且命中时会采用的严重级 —— 用来说明盲区背后压着多少分。 */
+  severity: "critical" | "high" | "medium" | "advisory" | "info";
+  title: string;
+  /** 缺失的输入指标键（如 `avg_turnover_20d`）。 */
+  missing_metric: string;
+  /** 该指标的中文名；服务端按 `graham.domain.metrics` 补齐。 */
+  missing_label?: string;
+}
+
 export interface StockDetail {
   /** 数据批次状态（全局事实，各页一致）。 */
   status?: DataStatus;
@@ -422,7 +450,16 @@ export interface StockDetail {
   ncav: NcavView;
   trend: Record<string, TrendSeries>;
   risk_flags: RiskFlag[];
+  /** 本批次未能复核的雷区信号（不扣分，但必须展示）。 */
+  unassessed_signals: UnassessedSignal[];
   provenance: ProvenanceEntry[];
+  /**
+   * 本平台**永远**取不到的信号说明。
+   *
+   * 与 `unassessed_signals` 是两个层次：这里是方法论层面的常量
+   * （"港股没有披露供股"），与批次和个股无关；那里是这只股票
+   * 这一次的缺口。前者讲规则，后者讲事实。
+   */
   unavailable_signals: string[];
   methodology_notes: string[];
 }
@@ -824,6 +861,13 @@ export interface StrategySummary {
   label: string;
   description: string;
   hit_count: number;
+  /**
+   * 命中里**存在未能复核信号**的标的数（按标的数，不按信号数）。
+   *
+   * 与 `hit_count` 并列展示：一份"深度低估"名单若有两成标的的流动性
+   * 根本没复核过，只报命中数就是在暗示这些行同样可信。
+   */
+  unassessed_hits: number;
   universe_size: number;
   selectivity: number | null;
   caveats: string[];
@@ -848,6 +892,14 @@ export interface StrategyHit {
    * 本项目对"边界"的一贯做法是把它说出来。
    */
   has_detail?: boolean;
+  /**
+   * 该行**未能复核**的风险信号。
+   *
+   * 缺键即"没有盲区" —— 列表载荷刻意稀疏：几千行的清单给每行挂一个空数组
+   * 只是噪声（详情页则相反，恒带该键）。这是"未知必须可见"落到列表页的
+   * 那一半：用户是在榜单和筛选表里做决定的，不是逐只点开详情页。
+   */
+  unassessed_signals?: UnassessedSignal[];
 }
 
 export interface StrategyHitDetailResponse {

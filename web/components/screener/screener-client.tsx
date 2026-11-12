@@ -28,6 +28,7 @@ import {
   ScoreCell,
 } from "@/components/ui";
 import { compareText, fmt, fmtInt } from "@/lib/format";
+import { missingLabelFor } from "@/lib/unassessed";
 import type { MarketInfo, Quadrant, RunInfo, ScoreRow } from "@/lib/types";
 
 import {
@@ -504,6 +505,7 @@ export function ScreenerClient({
                             <TurnoverCell
                               value={row.avg_turnover_20d}
                               market={row.market}
+                              unassessedLabel={missingLabelFor(row, "avg_turnover_20d")}
                             />
                           </td>
                           <td className="px-3 py-2 text-right">

@@ -17,6 +17,7 @@ import Link from "next/link";
 
 import { Badge, CoverageDots, DeltaCell, ScoreCell } from "@/components/ui";
 import { fmt, fmtRatio } from "@/lib/format";
+import { missingLabelFor } from "@/lib/unassessed";
 import type { ScoreRow } from "@/lib/types";
 
 import { QUADRANT_META } from "./filters";
@@ -70,7 +71,11 @@ export function ResultCards({ rows }: { rows: ScoreRow[] }) {
                   <CoverageDots value={row.coverage} />
                 </MiniField>
                 <MiniField label="日均成交额">
-                  <TurnoverCell value={row.avg_turnover_20d} market={row.market} />
+                  <TurnoverCell
+                    value={row.avg_turnover_20d}
+                    market={row.market}
+                    unassessedLabel={missingLabelFor(row, "avg_turnover_20d")}
+                  />
                 </MiniField>
                 <MiniField label="1 日">
                   <DeltaCell value={row.price_change_1d} showBar={false} />
