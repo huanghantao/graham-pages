@@ -35,7 +35,6 @@ function spec(
     weight,
     direction: "higher_better",
     min_age_years: 0,
-    categories: [],
     description: "",
     display_unit: "%",
     ...overrides,

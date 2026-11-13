@@ -43,17 +43,6 @@ export function FundTable({
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(25);
 
-  // 只显示对该类别有意义的因子（纯债不显示持仓因子）
-  const categoryFactors = useMemo(
-    () =>
-      factors.filter(
-        (f) =>
-          f.categories.length === 0 ||
-          f.categories.some((item) => item.key === group.category),
-      ),
-    [factors, group.category],
-  );
-
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const filtered = needle
@@ -99,7 +88,7 @@ export function FundTable({
         </div>
 
         {/* 权重每类别披露一次，而不是逐只重复（理由见 lib/fund-factors.ts）。 */}
-        <WeightComposition factors={categoryFactors} heading="评分构成" />
+        <WeightComposition factors={factors} heading="评分构成" />
         <FactorRowLegend />
 
         <ul className="divide-y divide-line/50">
@@ -204,7 +193,7 @@ export function FundTable({
                 </div>
 
                 <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2.5 pl-14 sm:grid-cols-3 lg:grid-cols-5">
-                  {categoryFactors.map((spec) => (
+                  {factors.map((spec) => (
                     <FactorRow
                       key={spec.key}
                       spec={spec}
@@ -277,9 +266,6 @@ export function FactorLegend({ factors }: { factors: FundFactorSpec[] }) {
                     权重 {(spec.weight * 100).toFixed(0)}% ·
                     {spec.direction === "lower_better" ? " 越小越好" : " 越大越好"}
                     {spec.min_age_years > 0 ? ` · 需成立满 ${spec.min_age_years} 年` : ""}
-                    {spec.categories.length > 0
-                      ? ` · 仅 ${spec.categories.map((item) => item.label).join("/")}`
-                      : " · 全部类别"}
                   </span>
                 </dt>
                 <dd className="mt-0.5 text-[11px] leading-4.5 text-fg-muted">

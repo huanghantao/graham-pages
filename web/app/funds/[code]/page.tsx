@@ -46,11 +46,7 @@ export default async function FundDetailPage({
 
   const byKey = new Map(detail.factors.map((f) => [f.key, f]));
   const na = new Map(detail.not_applicable.map((item) => [item.key, item.reason]));
-  const specs = (listing?.factors ?? []).filter(
-    (spec) =>
-      spec.categories.length === 0 ||
-      spec.categories.some((item) => item.key === detail.category),
-  );
+  const specs = listing?.factors ?? [];
   const cumulative = detail.context.cumulative_returns ?? {};
   const drawdowns = detail.context.drawdowns ?? {};
   // 被剔除的回撤原始值（上游返回的结构性不可能的值）。
@@ -361,15 +357,37 @@ export default async function FundDetailPage({
               />
               <Field
                 label="持仓加权覆盖"
-                value={`${(detail.context.holdings_coverage * 100).toFixed(0)}%`}
+                value={`${((detail.context.holdings_disclosure?.coverage ?? 0) * 100).toFixed(0)}%`}
+              />
+              <Field
+                label="持仓股质量"
+                value={
+                  detail.context.holdings_disclosure?.quality == null
+                    ? "不可得"
+                    : detail.context.holdings_disclosure.quality.toFixed(1)
+                }
+              />
+              <Field
+                label="持仓股便宜度"
+                value={
+                  detail.context.holdings_disclosure?.cheapness == null
+                    ? "不可得"
+                    : detail.context.holdings_disclosure.cheapness.toFixed(1)
+                }
               />
             </dl>
+            <p className="text-[10.5px] leading-4 text-fg-subtle">
+              持仓股质量与便宜度是<strong className="text-fg-muted">本站个股口径</strong>
+              的穿透值，<strong className="text-fg-muted">不参与评分</strong> ——
+              买基金是把选股权交给经理，分数只由业绩与回撤决定；
+              这两项用来看清「现在拿的是什么」，而不是给经理加分或减分。
+            </p>
 
             {detail.holdings.length === 0 ? (
               <p className="text-[11.5px] leading-5 text-fg-subtle">
                 该基金没有股票持仓数据 —— 纯债基金持有债券，
-                本项目的个股评分不适用，因此也不参与持仓类因子。
-                这是<strong className="text-fg-muted">本就不适用</strong>，不是数据缺失。
+                本项目的个股评分不适用，因此也不披露持仓穿透值。
+                这是<strong className="text-fg-muted">本就不采集</strong>，不是数据缺失。
               </p>
             ) : (
               <ul className="space-y-1">
@@ -409,9 +427,10 @@ export default async function FundDetailPage({
             )}
             <p className="border-t border-line/70 pt-2.5 text-[10.5px] leading-4 text-fg-subtle">
               持仓来自基金<strong className="text-fg-muted">季报</strong>，
-              最长可能滞后约四个月，期间基金完全可能已调仓。
-              持仓类因子只基于能匹配到本站个股评分的持仓计算，
-              覆盖率不足时该因子不取数、由其余因子重新归一权重。
+              最长可能滞后约四个月，期间基金完全可能已调仓 ——
+              它适合用来了解「现在拿的是什么」，不适合用来给经理打分。
+              穿透值只基于能匹配到本站个股评分的持仓计算，
+              覆盖率不足时留空，而不是按 0 计。
             </p>
           </CardBody>
         </Card>

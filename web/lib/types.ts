@@ -557,27 +557,20 @@ export interface FundFactorScore {
   percentile: number;
 }
 
-/** 因子的声明（由服务端下发，前端不硬编码口径）。 */
 /**
- * 因子适用的类别。
+ * 因子的声明（由服务端下发，前端不硬编码口径）。
  *
- * 带 `label` 而不是只给枚举值：前端因此**不需要**维护
- * 「枚举 → 中文」的映射表。那张表在新增类别时会被漏改，
- * 而漏改的症状是界面上出现 `bond_l1` 这样的英文键名。
+ * 七个类别共用一套因子：收益、平稳、回撤三条维度对纯债与偏股同样成立，
+ * 类别差异由**同类内百分位**消化，而不是"某些类别没有某些因子"。
+ * 因子集里不含持仓穿透指标 —— 买基金是把选股权交给经理，
+ * 评分只度量经理交出的业绩；持仓在详情页作披露，不进分数。
  */
-export interface FactorCategoryRef {
-  key: string;
-  label: string;
-}
-
 export interface FundFactorSpec {
   key: string;
   label: string;
   weight: number;
   direction: "higher_better" | "lower_better";
   min_age_years: number;
-  /** 空数组表示「全部类别适用」。 */
-  categories: FactorCategoryRef[];
   description: string;
   /** 原始值的展示单位后缀（`"%"` / `"pp"` / `""`），由服务端声明。 */
   display_unit: string;
@@ -685,7 +678,21 @@ export interface FundScoreRow {
     equity_ratio: number | null;
     top10_weight: number | null;
     manager_tenure: number | null;
-    holdings_coverage: number;
+    /**
+     * 持仓穿透指标 —— **不参与评分**，仅供了解"现在拿的是什么"。
+     *
+     * 它与业绩因子放在同一层会很危险：消费者会以为它是分数的一部分。
+     * 因此单独成组，分组名本身就是一句说明。
+     */
+    holdings_disclosure?: {
+      /** 前十大重仓股的加权质量度（本站个股口径，0~100）。 */
+      quality: number | null;
+      /** 前十大重仓股的加权便宜度（本站个股口径，0~100）。 */
+      cheapness: number | null;
+      /** 有本站个股评分的持仓权重占前十大总权重的比例。 */
+      coverage: number;
+      top10_weight: number | null;
+    };
     cumulative_returns: Record<string, number>;
     /** 回撤率（%），键是年数字符串。**已剔除**结构性不可能的值。 */
     drawdowns: Record<string, number>;
@@ -707,7 +714,7 @@ export interface FundGroup {
   upstream_name: string;
   /** 一句话定位：这类基金是什么、适合谁。由服务端下发，前端不硬编码。 */
   note: string;
-  /** 该类基金是否把股票当作投资标的（决定是否显示持仓类因子）。 */
+  /** 该类基金是否把股票当作投资标的（决定详情页有没有持仓可披露）。 */
   holds_equity: boolean;
   count: number;
   rows: FundScoreRow[];
